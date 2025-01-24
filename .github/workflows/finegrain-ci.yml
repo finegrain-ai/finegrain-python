@@ -1,0 +1,44 @@
+name: finegrain CI
+
+on:
+  push:
+    paths:
+      - finegrain/**
+      - .github/workflows/finegrain-ci.yml
+
+jobs:
+  lint_and_typecheck:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./finegrain
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          cache-prefix: 'finegrain-rye-cache'
+          working-directory: 'finegrain'
+
+      - name: add shims dir to PATH
+        run: echo "$RYE_HOME/shims" >> $GITHUB_PATH
+
+      - name: get pyright
+        run: rye tools install pyright --force
+
+      - name: rye sync
+        run: rye sync --no-dev --no-lock
+
+      - name: format
+        run: rye fmt --check
+
+      - name: lint
+        run: rye lint
+
+      - name: typecheck
+        run: pyright
