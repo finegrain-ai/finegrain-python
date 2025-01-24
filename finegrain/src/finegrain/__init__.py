@@ -45,9 +45,9 @@ class Futures[T]:
 
 @dc.dataclass(kw_only=True)
 class EditorAPIContext:
-    uri: str
     user: str
     password: str
+    base_url: str = "https://api.finegrain.ai/editor"
     priority: Priority = "standard"
     token: str | None = None
     verify: bool | str = True
@@ -89,7 +89,7 @@ class EditorAPIContext:
     async def login(self) -> None:
         async with self as client:
             response = await client.post(
-                f"{self.uri}/auth/login",
+                f"{self.base_url}/auth/login",
                 json={"username": self.user, "password": self.password},
             )
         response.raise_for_status()
@@ -109,7 +109,7 @@ class EditorAPIContext:
         async def _q() -> httpx.Response:
             return await client.request(
                 method,
-                f"{self.uri}/{url}",
+                f"{self.base_url}/{url}",
                 headers=dict(headers or {}) | self.auth_headers,
                 files=files,
                 params=params,
@@ -140,7 +140,7 @@ class EditorAPIContext:
     async def _sse_loop(self) -> None:
         response = await self.request("POST", "sub-auth")
         sub_token = response.json()["token"]
-        url = f"{self.uri}/sub/{sub_token}"
+        url = f"{self.base_url}/sub/{sub_token}"
         headers = {"Accept": "text/event-stream"}
         if self._sse_last_event_id:
             retry_ms = self._sse_retry_ms + 1000 * 2**self._sse_failures
@@ -254,12 +254,24 @@ class EditorAPIContext:
 
     async def call_skill(
         self,
-        uri: str,
-        params: dict[str, Any] | None,
+        url: str,
+        params: dict[str, Any] | None = None,
         timeout: float | None = None,
     ) -> tuple[str, bool]:
         params = {"priority": self.priority} | (params or {})
-        response = await self.request("POST", f"skills/{uri}", json=params)
+        response = await self.request("POST", f"skills/{url}", json=params)
         state_id = response.json()["state"]
         status = await self.sse_await(state_id, timeout=timeout)
         return state_id, status
+
+    async def ensure_skill(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> str:
+        st, ok = await self.call_skill(url, params, timeout=timeout)
+        if ok:
+            return st
+        meta = await self.get_meta(st)
+        raise RuntimeError(f"skill {url} failed with {st}: {meta}")
