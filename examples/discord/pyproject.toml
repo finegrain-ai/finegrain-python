@@ -1,0 +1,53 @@
+[project]
+name = "finegrain-discord"
+version = "0.1.0"
+description = "Meet our Discord bot, your friendly Finegrain API playground!"
+authors = [
+    { name = "The Finegrain Team", email = "bonjour@lagon.tech" }
+]
+dependencies = [
+    "discord-py>=2.4.0",
+    "environs>=14.1.0",
+    "pillow>=11.1.0",
+    "finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git#subdirectory=finegrain",
+]
+readme = "README.md"
+requires-python = ">= 3.12, <3.13"
+
+[project.scripts]
+start = "finegrain_discord:bot.main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/finegrain_discord"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "UP",  # pyupgrade
+  "A",   # flake8-builtins
+  "B",   # flake8-bugbear
+  "Q",   # flake8-quotes
+  "I",   # isort
+]
+
+[tool.pyright]
+include = ["src/finegrain_discord"]
+exclude = ["**/__pycache__"]
+typeCheckingMode = "strict"
