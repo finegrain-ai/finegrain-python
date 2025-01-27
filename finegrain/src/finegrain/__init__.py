@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses as dc
 import json
 import logging
 from collections import defaultdict
@@ -43,25 +42,53 @@ class Futures[T]:
             pass
 
 
-@dc.dataclass(kw_only=True)
 class EditorAPIContext:
     user: str
     password: str
-    base_url: str = "https://api.finegrain.ai/editor"
-    priority: Priority = "standard"
-    token: str | None = None
-    verify: bool | str = True
-    default_timeout: float = 60.0
-    logger: logging.Logger = logger
-    max_sse_failures: int = 5
+    base_url: str
+    priority: Priority
+    verify: bool | str
+    default_timeout: float
 
-    _client: httpx.AsyncClient | None = None
-    _client_ctx_depth: int = 0
-    _sse_futures: Futures[dict[str, Any]] = dc.field(default_factory=Futures)
-    _sse_task: asyncio.Task[None] | None = None
-    _sse_failures: int = 0
-    _sse_last_event_id: str = ""
-    _sse_retry_ms: int = 0
+    token: str | None
+    logger: logging.Logger
+    max_sse_failures: int
+
+    _client: httpx.AsyncClient | None
+    _client_ctx_depth: int
+    _sse_futures: Futures[dict[str, Any]]
+    _sse_task: asyncio.Task[None] | None
+    _sse_failures: int
+    _sse_last_event_id: str
+    _sse_retry_ms: int
+
+    def __init__(
+        self,
+        user: str,
+        password: str,
+        base_url: str = "https://api.finegrain.ai/editor",
+        priority: Priority = "standard",
+        verify: bool | str = True,
+        default_timeout: float = 60.0,
+    ) -> None:
+        self.user = user
+        self.password = password
+        self.base_url = base_url
+        self.priority = priority
+        self.verify = verify
+        self.default_timeout = default_timeout
+
+        self.token = None
+        self.logger = logger
+        self.max_sse_failures = 5
+
+        self._client = None
+        self._client_ctx_depth = 0
+        self._sse_futures = Futures()
+        self._sse_task = None
+        self._sse_failures = 0
+        self._sse_last_event_id = ""
+        self._sse_retry_ms = 0
 
     async def __aenter__(self) -> httpx.AsyncClient:
         if self._client:
