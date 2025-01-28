@@ -9,7 +9,6 @@ Here is an example script to erase an object from an image by prompt.
 ```py
 import argparse
 import asyncio
-from typing import Any
 
 from finegrain import EditorAPIContext
 
