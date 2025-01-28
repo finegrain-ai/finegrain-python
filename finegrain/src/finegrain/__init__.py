@@ -191,8 +191,9 @@ class EditorAPIContext:
                         self.logger.warning(f"unexpected SSE data: {sse.data}")
                         continue
                     self._sse_futures[jdata["state"]].set_result(jdata)
+                self.logger.info("SSE loop exited")
             except asyncio.CancelledError:
-                pass
+                self.logger.info("SSE loop cancelled")
 
     async def sse_start(self) -> None:
         assert self._sse_task is None
@@ -256,9 +257,11 @@ class EditorAPIContext:
                     raise RuntimeError(f"getting state {state_id} after timeout {timeout} returned {r.status_code}")
             if sse_task in done:
                 self._sse_failures += 1
-                if state_id != "_sse_loop" and (await self.sse_recover()):
-                    self._sse_failures = 0
-                    continue
+                if state_id != "_sse_loop":
+                    self.logger.info(f"SSE loop stopped while waiting for state {state_id}, recovering")
+                    if await self.sse_recover():
+                        self._sse_failures = 0
+                        continue
                 exception = sse_task.exception()
                 raise SSELoopStopped(f"SSE loop stopped while waiting for state {state_id}") from exception
             break
