@@ -165,41 +165,41 @@ class EditorAPIContext:
         return cast(dict[str, Any], r)
 
     async def _sse_loop(self) -> None:
+        sub_headers = {"Accept": "text/event-stream"}
+        retry_ms = self._sse_retry_ms + 1000 * (2**self._sse_failures - 1)
+        if self._sse_last_event_id:
+            self.logger.info(f"resuming SSE from event {self._sse_last_event_id} in {retry_ms} ms")
+            sub_headers["Last-Event-ID"] = self._sse_last_event_id
+        elif retry_ms > 0:
+            self.logger.info(f"resuming SSE in {retry_ms} ms")
+        await asyncio.sleep(retry_ms / 1000)
+
         response = await self.request("POST", "sub-auth")
         sub_token = response.json()["token"]
-        url = f"{self.base_url}/sub/{sub_token}"
-        headers = {"Accept": "text/event-stream"}
-        if self._sse_last_event_id:
-            retry_ms = self._sse_retry_ms + 1000 * 2**self._sse_failures
-            self.logger.info(f"resuming SSE from event {self._sse_last_event_id} in {retry_ms} ms")
-            await asyncio.sleep(retry_ms / 1000)
-            headers["Last-Event-ID"] = self._sse_last_event_id
+        sub_url = f"{self.base_url}/sub/{sub_token}"
+
         async with (
             httpx.AsyncClient(timeout=None, verify=self.verify) as c,
-            httpx_sse.aconnect_sse(c, "GET", url, headers=headers) as es,
+            httpx_sse.aconnect_sse(c, "GET", sub_url, headers=sub_headers) as es,
         ):
             es.response.raise_for_status()
             self._sse_futures["_sse_loop"].set_result({"status": "ok"})
-            try:
-                async for sse in es.aiter_sse():
-                    self._sse_last_event_id = sse.id
-                    self._sse_retry_ms = sse.retry or 0
-                    if sse.event == "ping":
-                        self.logger.debug("got SSE ping")
+            async for sse in es.aiter_sse():
+                self._sse_last_event_id = sse.id
+                self._sse_retry_ms = sse.retry or 0
+                if sse.event == "ping":
+                    self.logger.debug("got SSE ping")
+                    continue
+                elif sse.event == "message":
+                    jdata = self.decode_json(sse.data)
+                    if (jdata is None) or ("state" not in jdata):
+                        # When the server restarts we can get an empty string here.
+                        self.logger.warning(f"unexpected SSE message: {sse.data}")
                         continue
-                    elif sse.event == "message":
-                        jdata = self.decode_json(sse.data)
-                        if (jdata is None) or ("state" not in jdata):
-                            # Note: when the server restarts we typically get an
-                            # empty string here, then the loop exits.
-                            self.logger.warning(f"unexpected SSE message: {sse.data}")
-                            continue
-                        self._sse_futures[jdata["state"]].set_result(jdata)
-                    else:
-                        self.logger.warning(f"unexpected SSE event: {sse.event} ({sse.data})")
-                self.logger.info("SSE loop exited")
-            except asyncio.CancelledError:
-                self.logger.info("SSE loop cancelled")
+                    self._sse_futures[jdata["state"]].set_result(jdata)
+                else:
+                    self.logger.warning(f"unexpected SSE event: {sse.event} ({sse.data})")
+            self.logger.info("SSE loop exited")
 
     async def sse_start(self) -> None:
         assert self._sse_task is None
