@@ -184,13 +184,19 @@ class EditorAPIContext:
                 async for sse in es.aiter_sse():
                     self._sse_last_event_id = sse.id
                     self._sse_retry_ms = sse.retry or 0
-                    jdata = self.decode_json(sse.data)
-                    if (jdata is None) or ("state" not in jdata):
-                        # Note: when the server restarts we typically get an
-                        # empty string here, then the loop exits.
-                        self.logger.warning(f"unexpected SSE data: {sse.data}")
+                    if sse.event == "ping":
+                        self.logger.debug("got SSE ping")
                         continue
-                    self._sse_futures[jdata["state"]].set_result(jdata)
+                    elif sse.event == "message":
+                        jdata = self.decode_json(sse.data)
+                        if (jdata is None) or ("state" not in jdata):
+                            # Note: when the server restarts we typically get an
+                            # empty string here, then the loop exits.
+                            self.logger.warning(f"unexpected SSE message: {sse.data}")
+                            continue
+                        self._sse_futures[jdata["state"]].set_result(jdata)
+                    else:
+                        self.logger.warning(f"unexpected SSE event: {sse.event} ({sse.data})")
                 self.logger.info("SSE loop exited")
             except asyncio.CancelledError:
                 self.logger.info("SSE loop cancelled")
