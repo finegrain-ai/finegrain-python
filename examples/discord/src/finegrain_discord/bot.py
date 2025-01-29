@@ -104,14 +104,27 @@ async def _ensure_infer_bbox(api_ctx: EditorAPIContext, state_id: str, prompt: s
     return st_boxed
 
 
-async def _call_object_eraser(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> BotImage:
+async def _ensure_segment(api_ctx: EditorAPIContext, state_id: str, prompt: str) -> str:
+    st_boxed = await _ensure_infer_bbox(api_ctx, state_id, prompt)
+    return await api_ctx.ensure_skill(f"segment/{st_boxed}")
+
+
+async def _call_object_eraser(
+    api_ctx: EditorAPIContext, image: BotImage, prompt: str, extra_prompts: tuple[str, ...] = ()
+) -> BotImage:
     with BytesIO() as f:
         f.write(image.data)
         response = await api_ctx.request("POST", "state/upload", files={"file": f})
     st_input = response.json()["state"]
 
-    st_boxed = await _ensure_infer_bbox(api_ctx, st_input, prompt)
-    st_mask = await api_ctx.ensure_skill(f"segment/{st_boxed}")
+    all_prompts = (prompt, *extra_prompts)
+    async with asyncio.TaskGroup() as tg:
+        segmentations = [tg.create_task(_ensure_segment(api_ctx, st_input, prompt)) for prompt in all_prompts]
+    st_masks = [segmentation.result() for segmentation in segmentations]
+    if len(st_masks) == 1:
+        st_mask = st_masks[0]
+    else:
+        st_mask = await api_ctx.ensure_skill("merge-masks", {"operation": "union", "states": st_masks})
     st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "free"})
 
     response = await api_ctx.request(
@@ -135,8 +148,7 @@ async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt
         response = await api_ctx.request("POST", "state/upload", files={"file": f})
     st_input = response.json()["state"]
 
-    st_boxed = await _ensure_infer_bbox(api_ctx, st_input, prompt)
-    st_mask = await api_ctx.ensure_skill(f"segment/{st_boxed}")
+    st_mask = await _ensure_segment(api_ctx, st_input, prompt)
     st_cutout = await api_ctx.ensure_skill(f"cutout/{st_input}/{st_mask}")
 
     response = await api_ctx.request(
@@ -175,6 +187,16 @@ async def _load_attached_image(attachment: discord.Attachment) -> BotImage:
     return await BotImage.from_attachment(attachment)
 
 
+def _format_name_list(names: tuple[str, ...]) -> str:
+    if not names:
+        return "N/A"
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + f", and {names[-1]}"
+
+
 @bot.event
 async def on_ready() -> None:
     _log.info(f"logged in as {bot.user}")
@@ -191,12 +213,18 @@ async def show_help(interaction: discord.Interaction):
 
     Just type a slash command, watch it work, and see the results instantly. No setup, no hassle — just pure tinkering fun.
 
-    `/help`
-    `/erase`
-    `/cutout`
+    `/help` - Show this help message
+    `/erase` - Erase one or more objects from an image by simply naming them
+    `/cutout` - Create a cutout from an image by naming an object
 
     (and more to come!)
 
+    Examples:
+    ```
+    /erase mug        # Remove a mug from the image
+    /erase mug spoon  # Remove a mug and a spoon from the image
+    /cutout chair     # Create a cutout of a chair from the image
+    ```
     Just a heads-up: Finegrain offers various speed/quality trade-offs. The bot is optimized for speed, but if you're looking for higher quality, feel free to sign up and get an API key!
 
     Learn more at https://finegrain.ai
@@ -206,15 +234,28 @@ async def show_help(interaction: discord.Interaction):
 
 
 @bot.tree.command()
-@app_commands.describe(image="The input image.", prompt="Describe the object you want to erase from the image.")
-async def erase(interaction: discord.Interaction, image: discord.Attachment, prompt: str) -> None:
-    """Erase a specific object from the attached image."""
+@app_commands.describe(
+    image="The input image.",
+    primary_object="Name the main object you want to erase from the image.",
+    next_object="Name an additional object to erase, if any.",
+    another_object="Name another object to erase, if needed.",
+)
+async def erase(
+    interaction: discord.Interaction,
+    image: discord.Attachment,
+    primary_object: str,
+    next_object: str | None,
+    another_object: str | None,
+) -> None:
+    """Erase one or more objects from the attached image."""
     bot_image = await _load_attached_image(image)
     await interaction.response.defer(thinking=True)
-    output_bot_image = await _call_object_eraser(bot.api_ctx, bot_image, prompt)
+    extra_objects = tuple(obj for obj in (next_object, another_object) if obj is not None)
+    output_bot_image = await _call_object_eraser(bot.api_ctx, bot_image, primary_object, extra_objects)
     assert output_bot_image.content_type == "image/jpeg"
+    removed_objects = (primary_object, *extra_objects)
     await interaction.followup.send(
-        f"Here is your image and the version without '{prompt}'.",
+        f"Here is your image and the version without '{_format_name_list(removed_objects)}'.",
         files=(
             discord.File(BytesIO(bot_image.data), filename=image.filename),
             discord.File(BytesIO(output_bot_image.data), filename=f"{output_bot_image.uid}.jpg"),
@@ -223,15 +264,18 @@ async def erase(interaction: discord.Interaction, image: discord.Attachment, pro
 
 
 @bot.tree.command()
-@app_commands.describe(image="The input image.", prompt="Describe the object you want to cut out from the image.")
-async def cutout(interaction: discord.Interaction, image: discord.Attachment, prompt: str) -> None:
+@app_commands.describe(
+    image="The input image.",
+    main_object="Name the main object you want to cut out from the image.",
+)
+async def cutout(interaction: discord.Interaction, image: discord.Attachment, main_object: str) -> None:
     """Create a cutout for a specific object from the attached image."""
     bot_image = await _load_attached_image(image)
     await interaction.response.defer(thinking=True)
-    output_bot_image = await _call_object_cutter(bot.api_ctx, bot_image, prompt)
+    output_bot_image = await _call_object_cutter(bot.api_ctx, bot_image, main_object)
     assert output_bot_image.content_type == "image/png"
     await interaction.followup.send(
-        f"Here is your image and the cutout for '{prompt}'",
+        f"Here is your image and the cutout for '{main_object}'.",
         files=(
             discord.File(BytesIO(bot_image.data), filename=image.filename),
             discord.File(BytesIO(output_bot_image.data), filename=f"{output_bot_image.uid}.png"),
