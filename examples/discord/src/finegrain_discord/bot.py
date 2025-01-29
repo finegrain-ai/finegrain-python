@@ -234,51 +234,55 @@ async def show_help(interaction: discord.Interaction):
 
 
 @bot.tree.command()
+@app_commands.rename(attachment="image")
 @app_commands.describe(
-    image="The input image.",
+    attachment="The input image.",
     primary_object="Name the main object you want to erase from the image.",
     next_object="Name an additional object to erase, if any.",
     another_object="Name another object to erase, if needed.",
 )
 async def erase(
     interaction: discord.Interaction,
-    image: discord.Attachment,
+    attachment: discord.Attachment,
     primary_object: str,
     next_object: str | None,
     another_object: str | None,
 ) -> None:
     """Erase one or more objects from the attached image."""
-    bot_image = await _load_attached_image(image)
+    input_image = await _load_attached_image(attachment)
+    interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
     extra_objects = tuple(obj for obj in (next_object, another_object) if obj is not None)
-    output_bot_image = await _call_object_eraser(bot.api_ctx, bot_image, primary_object, extra_objects)
-    assert output_bot_image.content_type == "image/jpeg"
+    output_image = await _call_object_eraser(bot.api_ctx, input_image, primary_object, extra_objects)
+    assert output_image.content_type == "image/jpeg"
     removed_objects = (primary_object, *extra_objects)
     await interaction.followup.send(
         f"Here is your image and the version without '{_format_name_list(removed_objects)}'.",
         files=(
-            discord.File(BytesIO(bot_image.data), filename=image.filename),
-            discord.File(BytesIO(output_bot_image.data), filename=f"{output_bot_image.uid}.jpg"),
+            interaction.extras["input_file"],
+            discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.jpg"),
         ),
     )
 
 
 @bot.tree.command()
+@app_commands.rename(attachment="image")
 @app_commands.describe(
-    image="The input image.",
+    attachment="The input image.",
     main_object="Name the main object you want to cut out from the image.",
 )
-async def cutout(interaction: discord.Interaction, image: discord.Attachment, main_object: str) -> None:
+async def cutout(interaction: discord.Interaction, attachment: discord.Attachment, main_object: str) -> None:
     """Create a cutout for a specific object from the attached image."""
-    bot_image = await _load_attached_image(image)
+    input_image = await _load_attached_image(attachment)
+    interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_bot_image = await _call_object_cutter(bot.api_ctx, bot_image, main_object)
-    assert output_bot_image.content_type == "image/png"
+    output_image = await _call_object_cutter(bot.api_ctx, input_image, main_object)
+    assert output_image.content_type == "image/png"
     await interaction.followup.send(
         f"Here is your image and the cutout for '{main_object}'.",
         files=(
-            discord.File(BytesIO(bot_image.data), filename=image.filename),
-            discord.File(BytesIO(output_bot_image.data), filename=f"{output_bot_image.uid}.png"),
+            interaction.extras["input_file"],
+            discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.png"),
         ),
     )
 
@@ -288,6 +292,7 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
     command = interaction.command.name if interaction.command is not None else "N/A"
     _log.error(f"command={command}", exc_info=error)
 
+    files: list[discord.File] = []
     if isinstance(error, UserInputError):
         reply = f"Oops! That file doesn't work \N{THINKING FACE}. {error}"
     elif isinstance(error, ObjectNotFoundError):
@@ -295,13 +300,16 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
             f"Oops! Couldn't find '{error.prompt}' in the image \N{LEFT-POINTING MAGNIFYING GLASS}. "
             "Try again with a different prompt or image!"
         )
+        input_file = interaction.extras.get("input_file")
+        assert isinstance(input_file, discord.File)
+        files.append(input_file)
     else:
         reply = "Oops! Something went wrong \N{CONFUSED FACE}. Give it another try in a bit!"
 
     if interaction.response.type == discord.InteractionResponseType.deferred_channel_message:
-        await interaction.followup.send(reply)
+        await interaction.followup.send(reply, files=files)
     else:
-        await interaction.response.send_message(reply)
+        await interaction.response.send_message(reply, files=files)
 
 
 async def start_bot(reconnect: bool = True) -> None:
