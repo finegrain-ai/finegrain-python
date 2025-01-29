@@ -118,8 +118,13 @@ async def _call_object_eraser(
     st_input = response.json()["state"]
 
     all_prompts = (prompt, *extra_prompts)
-    async with asyncio.TaskGroup() as tg:
-        segmentations = [tg.create_task(_ensure_segment(api_ctx, st_input, prompt)) for prompt in all_prompts]
+    try:
+        async with asyncio.TaskGroup() as tg:
+            segmentations = [tg.create_task(_ensure_segment(api_ctx, st_input, prompt)) for prompt in all_prompts]
+    except ExceptionGroup as eg:
+        if not_found_errors := [exc for exc in eg.exceptions if isinstance(exc, ObjectNotFoundError)]:
+            raise ObjectNotFoundError(_format_name_list(tuple(exc.prompt for exc in not_found_errors))) from eg
+        raise
     st_masks = [segmentation.result() for segmentation in segmentations]
     if len(st_masks) == 1:
         st_mask = st_masks[0]
@@ -287,6 +292,9 @@ async def cutout(interaction: discord.Interaction, attachment: discord.Attachmen
     )
 
 
+# NOTE: as per discord.py `ErrorFunc`, the coroutine is annotated with `discord.Interaction` and
+# `app_commands.AppCommandError` as arguments. Still, at runtime, this coroutine might receive other kinds of
+# exceptions like `ExceptionGroup` from `asyncio.TaskGroup`.
 @bot.tree.error
 async def on_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
     command = interaction.command.name if interaction.command is not None else "N/A"
