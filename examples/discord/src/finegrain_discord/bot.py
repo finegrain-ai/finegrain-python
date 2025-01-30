@@ -20,6 +20,7 @@ with env.prefixed("FG_"):
     API_URL: str = str(env.str("API_URL", "https://api.finegrain.ai/editor"))
     API_USER: str | None = env.str("API_USER")
     API_PASSWORD: str | None = env.str("API_PASSWORD")
+    API_VERIFY: str | bool = env.str("CA_BUNDLE", None) or True
 LOGLEVEL = env.str("LOGLEVEL", "INFO").upper()
 LOGLEVEL_INT: int = logging.getLevelNamesMapping().get(LOGLEVEL, logging.INFO)
 
@@ -61,7 +62,13 @@ intents.message_content = True
 
 assert API_USER is not None
 assert API_PASSWORD is not None
-api_ctx = EditorAPIContext(base_url=API_URL, user=API_USER, password=API_PASSWORD, priority=API_PRIORITY)
+api_ctx = EditorAPIContext(
+    base_url=API_URL,
+    user=API_USER,
+    password=API_PASSWORD,
+    priority=API_PRIORITY,
+    verify=API_VERIFY,
+)
 bot = FinegrainBot(api_ctx, intents=intents)
 
 _log = logging.getLogger(__name__)
