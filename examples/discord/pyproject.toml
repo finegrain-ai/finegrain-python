@@ -23,7 +23,9 @@ build-backend = "hatchling.build"
 
 [tool.rye]
 managed = true
-dev-dependencies = []
+dev-dependencies = [
+    "aiomonitor>=0.7.1",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true

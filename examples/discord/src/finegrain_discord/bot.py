@@ -16,6 +16,7 @@ env.read_env()
 with env.prefixed("DISCORD_"):
     DISCORD_TOKEN: str | None = env.str("TOKEN")
     DISCORD_GUILD_ID: int | None = env.int("GUILD_ID")
+    DISCORD_DEBUG = env.bool("DEBUG", False)
 with env.prefixed("FG_"):
     API_URL: str = str(env.str("API_URL", "https://api.finegrain.ai/editor"))
     API_USER: str | None = env.str("API_USER")
@@ -327,16 +328,26 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
         await interaction.response.send_message(reply, files=files)
 
 
-async def start_bot(reconnect: bool = True) -> None:
+async def start_bot(reconnect: bool = True, debug: bool = False) -> None:
     assert DISCORD_TOKEN is not None
     # NOTE: `root=True` means it will affect all loggers rather than just the discord logger, httpx included.
     discord.utils.setup_logging(level=LOGLEVEL_INT, root=True)
-    async with bot:
-        await bot.start(DISCORD_TOKEN, reconnect=reconnect)
+    if debug:
+        import aiomonitor
+
+        logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
+
+        loop = asyncio.get_running_loop()
+        with aiomonitor.start_monitor(loop):
+            async with bot:
+                await bot.start(DISCORD_TOKEN, reconnect=reconnect)
+    else:
+        async with bot:
+            await bot.start(DISCORD_TOKEN, reconnect=reconnect)
 
 
 def main() -> None:
-    asyncio.run(start_bot())
+    asyncio.run(start_bot(debug=DISCORD_DEBUG))
 
 
 if __name__ == "__main__":
