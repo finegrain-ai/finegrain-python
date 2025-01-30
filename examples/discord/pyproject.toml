@@ -9,7 +9,7 @@ dependencies = [
     "discord-py>=2.4.0",
     "environs>=14.1.0",
     "pillow>=11.1.0",
-    "finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git#subdirectory=finegrain",
+    "finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@a96b202b009c845df373e27b7ca29934ad387a2a#subdirectory=finegrain",
 ]
 readme = "README.md"
 requires-python = ">= 3.12, <3.13"
