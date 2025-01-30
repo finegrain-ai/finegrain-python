@@ -27,7 +27,7 @@ discord-py==2.4.0
     # via finegrain-discord
 environs==14.1.0
     # via finegrain-discord
-finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@916b054ee0d7f4ce0158ceec1d2be4d0bccdfcfe#subdirectory=finegrain
+finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@a96b202b009c845df373e27b7ca29934ad387a2a#subdirectory=finegrain
     # via finegrain-discord
 frozenlist==1.5.0
     # via aiohttp
