@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Module",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "quart",
+            "args": [
+                "run",
+                "--port",
+                "8601",
+                "--host",
+                "0.0.0.0",
+            ],
+            "env": {
+                "QUART_APP": "chatgpt_bridge:app",
+            }
+        }
+    ]
+}
