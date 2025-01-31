@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 
 import httpx
 import httpx_sse
-from httpx._types import QueryParamTypes, RequestFiles
+from httpx._types import QueryParamTypes, RequestData, RequestFiles
 
 logger = logging.getLogger(__name__)
 
@@ -296,6 +296,7 @@ class EditorAPIContext:
         method: Literal["GET", "POST"],
         url: str,
         files: RequestFiles | None = None,
+        data: RequestData | None = None,
         params: QueryParamTypes | None = None,
         json: dict[str, Any] | None = None,
         headers: Mapping[str, str] | None = None,
@@ -307,6 +308,7 @@ class EditorAPIContext:
                 f"{self.base_url}/{url}",
                 headers=dict(headers or {}) | self.auth_headers,
                 files=files,
+                data=data,
                 params=params,
                 json=json,
             )
