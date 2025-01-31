@@ -200,7 +200,8 @@ class ResilientEventSource:
                 if self.retry_ctx.failures > 0:
                     self.logger.info(
                         f"SSE loop retry attempt {self.retry_ctx.failures} "
-                        f"(backoff {self.retry_ctx.backoff:.3f}, retry_ms {self._retry_ms})"
+                        f"(backoff {self.retry_ctx.backoff:.3f}, retry_ms {self._retry_ms}, "
+                        f"last error {self.retry_ctx.last_error})"
                     )
                     await asyncio.sleep(self.retry_ctx.backoff + self._retry_ms / 1000)
                 url = await self.get_url()
@@ -232,6 +233,8 @@ class ResilientEventSource:
                         yield event
                     raise SSELoopStopped(message="SSE loop exited")
             except (SSELoopStopped, httpx.HTTPError, TimeoutError) as exc:
+                if isinstance(exc, TimeoutError) and not str(exc):
+                    exc = TimeoutError("timeout")
                 self.failure(exc)
 
 
