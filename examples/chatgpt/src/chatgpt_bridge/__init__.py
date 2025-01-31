@@ -1,0 +1,115 @@
+import logging
+from typing import Any
+
+from finegrain import EditorAPIContext
+from quart import Quart, Response, jsonify, request
+
+from chatgpt_bridge.env import (
+    APP_LOGLEVEL,
+    CHATGPT_AUTH_TOKEN,
+    FG_API_PASSWORD,
+    FG_API_PRIORITY,
+    FG_API_TIMEOUT,
+    FG_API_URL,
+    FG_API_USER,
+    LOGLEVEL,
+)
+from chatgpt_bridge.skills.box import _box
+from chatgpt_bridge.skills.cutout import _cutout
+from chatgpt_bridge.skills.erase import _eraser
+from chatgpt_bridge.skills.recolor import _recolor
+from chatgpt_bridge.skills.shadow import _shadow
+from chatgpt_bridge.skills.undo import _undo
+from chatgpt_bridge.skills.upscale import _upscale
+from chatgpt_bridge.utils import json_error, require_basic_auth_token
+
+ctx = EditorAPIContext(
+    base_url=FG_API_URL,
+    user=FG_API_USER,
+    password=FG_API_PASSWORD,
+    priority=FG_API_PRIORITY,
+    default_timeout=FG_API_TIMEOUT,
+)
+
+app = Quart(__name__)
+
+logging.basicConfig(level=LOGLEVEL)
+app.logger.setLevel(APP_LOGLEVEL)
+app.logger.info(f"LOGLEVEL: {LOGLEVEL}")
+app.logger.info(f"FG_API_URL: {FG_API_URL}")
+app.logger.info(f"FG_API_USER: {FG_API_USER}")
+app.logger.info(f"FG_API_TIMEOUT: {FG_API_TIMEOUT}")
+app.logger.info(f"FG_API_PRIORITY: {FG_API_PRIORITY}")
+
+
+@app.before_serving
+async def login() -> None:
+    await ctx.login()
+
+
+@app.before_serving
+async def sse_start() -> None:
+    await ctx.sse_start()
+
+
+@app.after_serving
+async def sse_stop() -> None:
+    await ctx.sse_stop()
+
+
+@app.before_request
+async def log_request() -> None:
+    app.logger.debug(f"Incoming request: {request.method} {request.path}")
+
+
+@app.errorhandler(RuntimeError)
+async def handle_runtime_error(error: RuntimeError) -> Response:
+    app.logger.error(f"RuntimeError: {error}")
+    return json_error(str(error))
+
+
+@app.route("/health")
+async def health() -> Response:
+    return jsonify({"status": "healthy"})
+
+
+@app.post("/upscale")
+@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
+async def upscale() -> Any:
+    return await _upscale(ctx, request)
+
+
+@app.post("/box")
+@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
+async def infer_bbox() -> Any:
+    return await _box(ctx, request)
+
+
+@app.post("/cutout")
+@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
+async def cutout() -> Any:
+    return await _cutout(ctx, request)
+
+
+@app.post("/erase")
+@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
+async def erase() -> Any:
+    return await _eraser(ctx, request)
+
+
+@app.post("/recolor")
+@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
+async def recolor() -> Any:
+    return await _recolor(ctx, request)
+
+
+@app.post("/shadow")
+@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
+async def shadow() -> Any:
+    return await _shadow(ctx, request)
+
+
+@app.post("/undo")
+@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
+async def undo() -> Any:
+    return await _undo(ctx, request)
