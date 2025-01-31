@@ -222,15 +222,12 @@ class EditorAPIContext:
 
     token: str | None
     logger: logging.Logger
-    max_sse_failures: int
 
     _client: httpx.AsyncClient | None
     _client_ctx_depth: int
     _sse_futures: Futures[dict[str, Any]]
+    _sse_source: ResilientEventSource
     _sse_task: asyncio.Task[None] | None
-    _sse_failures: int
-    _sse_last_event_id: str
-    _sse_retry_ms: int
 
     def __init__(
         self,
@@ -248,15 +245,20 @@ class EditorAPIContext:
         self.verify = verify
         self.default_timeout = default_timeout
 
-        self.token = None
         self.logger = logger
+        self._sse_source = ResilientEventSource(url=self.get_sub_url, verify=self.verify)
+        self.reset()
 
+    def reset(self) -> None:
+        self.token = None
         self._client = None
         self._client_ctx_depth = 0
-
         self._sse_futures = Futures()
-        self._sse_source = ResilientEventSource(self.get_sub_url, verify=self.verify)
         self._sse_task = None
+        try:
+            self._sse_source.reset()
+        except RuntimeError:  # outside asyncio
+            pass
 
     async def __aenter__(self) -> httpx.AsyncClient:
         if self._client:
