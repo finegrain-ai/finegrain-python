@@ -20,14 +20,14 @@ anyio==4.8.0
     # via httpx
 attrs==25.1.0
     # via aiohttp
-certifi==2024.12.14
+certifi==2025.1.31
     # via httpcore
     # via httpx
 discord-py==2.4.0
     # via finegrain-discord
 environs==14.1.0
     # via finegrain-discord
-finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@a96b202b009c845df373e27b7ca29934ad387a2a#subdirectory=finegrain
+finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@f3e84d877cc40f8801c7865d70d604fce5401add#subdirectory=finegrain
     # via finegrain-discord
 frozenlist==1.5.0
     # via aiohttp
