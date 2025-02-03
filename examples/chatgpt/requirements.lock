@@ -19,7 +19,7 @@ anyio==4.8.0
 blinker==1.9.0
     # via flask
     # via quart
-certifi==2024.12.14
+certifi==2025.1.31
     # via httpcore
     # via httpx
 click==8.1.8
@@ -27,7 +27,7 @@ click==8.1.8
     # via quart
 environs==14.1.0
     # via chatgpt-bridge
-finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@f0760005675992988c2913afee37cdec7d7d9327#subdirectory=finegrain
+finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@12886f630f805119670eb24c9b58a5aa97335a1f#subdirectory=finegrain
     # via chatgpt-bridge
 flask==3.1.0
     # via quart
@@ -35,7 +35,7 @@ h11==0.14.0
     # via httpcore
     # via hypercorn
     # via wsproto
-h2==4.1.0
+h2==4.2.0
     # via hypercorn
 hpack==4.1.0
     # via h2
