@@ -30,6 +30,7 @@ DISCORD_GUILD = discord.Object(id=DISCORD_GUILD_ID)  # aka "server" in the Disco
 
 ALLOWED_IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp")
 API_PRIORITY: Priority = "low"
+INFO_EMOJI = "\u2139\ufe0f"
 
 
 class UserInputError(app_commands.AppCommandError):
@@ -269,8 +270,12 @@ async def erase(
     output_image = await _call_object_eraser(bot.api_ctx, input_image, primary_object, extra_objects)
     assert output_image.content_type == "image/jpeg"
     removed_objects = (primary_object, *extra_objects)
+    reply = (
+        f"Here is your image and the version without '{_format_name_list(removed_objects)}'. "
+        f"{INFO_EMOJI} Generated with the API's express mode. Upgrade for higher quality."
+    )
     await interaction.followup.send(
-        f"Here is your image and the version without '{_format_name_list(removed_objects)}'.",
+        reply,
         files=(
             interaction.extras["input_file"],
             discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.jpg"),
