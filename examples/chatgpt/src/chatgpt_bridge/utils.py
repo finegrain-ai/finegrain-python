@@ -34,14 +34,18 @@ def require_basic_auth_token(token: str):
 
 async def create_state(
     ctx: EditorAPIContext,
-    file_url: str,
+    file_url: str | None = None,
+    file: io.BytesIO | None = None,
     timeout: float | None = None,
 ) -> str:
+    assert file_url or file, "file_url or file is required"
+
     response = await ctx.request(
         method="POST",
         url="state/create",
         json={"priority": ctx.priority},
-        data={"file_url": file_url},
+        data={"file_url": file_url} if file_url else None,
+        files={"file": file} if file else None,
     )
     state_id = response.json()["state"]
     status = await ctx.sse_await(state_id, timeout=timeout)
