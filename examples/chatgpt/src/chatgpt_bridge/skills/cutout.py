@@ -1,3 +1,5 @@
+import io
+
 from finegrain import EditorAPIContext
 from PIL import Image
 from pydantic import BaseModel
@@ -17,6 +19,7 @@ class CutoutParams(BaseModel):
 class CutoutOutput(BaseModel):
     openaiFileResponse: list[OpenaiFileResponse]  # noqa: N815
     stateids_undo: list[StateID]
+    stateids_output: list[StateID]
 
 
 async def process(
@@ -24,7 +27,7 @@ async def process(
     stateid_input: StateID,
     background_color: str,
     object_name: str,
-) -> Image.Image:
+) -> tuple[Image.Image, StateID]:
     # queue skills/infer-bbox
     stateid_bbox = await ctx.ensure_skill(
         url=f"infer-bbox/{stateid_input}",
@@ -58,7 +61,13 @@ async def process(
     cutout_margin.paste(cutout, bbox, cutout)
     cutout_margin = cutout_margin.convert("RGB")
 
-    return cutout_margin
+    # upload the cutout with margin to the API
+    cutout_margin_data = io.BytesIO()
+    cutout_margin.save(cutout_margin_data, format="JPEG")
+    stateid_cutout_margin = await create_state(ctx, file=cutout_margin_data)
+    app.logger.debug(f"stateid_cutout_margin: {stateid_cutout_margin}")
+
+    return cutout_margin, stateid_cutout_margin
 
 
 async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
@@ -95,7 +104,7 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
         return json_error("stateids_input and background_colors must have the same length", 400)
 
     # process the inputs
-    cutouts = [
+    outputs = [
         await process(
             ctx=ctx,
             object_name=object_name,
@@ -109,6 +118,8 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
             strict=True,
         )
     ]
+    cutouts = [output[0] for output in outputs]
+    stateids_output = [output[1] for output in outputs]
 
     # build output response
     output_data = CutoutOutput(
@@ -120,6 +131,7 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
             for i, cutout in enumerate(cutouts)
         ],
         stateids_undo=stateids_input,
+        stateids_output=stateids_output,
     )
     app.logger.debug(f"output_json: {output_data}")
     output_response = jsonify(output_data.model_dump())
