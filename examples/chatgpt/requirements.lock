@@ -62,7 +62,7 @@ markupsafe==3.0.2
     # via jinja2
     # via quart
     # via werkzeug
-marshmallow==3.26.0
+marshmallow==3.26.1
     # via environs
 packaging==24.2
     # via marshmallow
