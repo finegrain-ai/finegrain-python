@@ -1,9 +1,9 @@
 import logging
 from typing import Any
 
-from finegrain import EditorAPIContext
 from quart import Quart, Response, jsonify, request
 
+from chatgpt_bridge.context import EditorAPIContextCached
 from chatgpt_bridge.env import (
     APP_LOGLEVEL,
     CHATGPT_AUTH_TOKEN,
@@ -23,7 +23,7 @@ from chatgpt_bridge.skills.undo import _undo
 from chatgpt_bridge.skills.upscale import _upscale
 from chatgpt_bridge.utils import json_error, require_basic_auth_token
 
-ctx = EditorAPIContext(
+ctx = EditorAPIContextCached(
     base_url=FG_API_URL,
     user=FG_API_USER,
     password=FG_API_PASSWORD,
@@ -59,7 +59,7 @@ async def sse_stop() -> None:
 
 @app.before_request
 async def log_request() -> None:
-    app.logger.debug(f"{request.method} {request.path=}")
+    app.logger.debug(f"Incoming request: {request.method} {request.path}")
 
 
 @app.errorhandler(RuntimeError)
