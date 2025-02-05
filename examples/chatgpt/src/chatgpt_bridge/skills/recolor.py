@@ -34,9 +34,9 @@ async def process(
             url=f"infer-bbox/{stateid_input}",
             params={"product_name": name},
         )
-        app.logger.debug(f"stateid_bbox_positive: {stateid_bbox_positive}")
+        app.logger.debug(f"{stateid_bbox_positive=}")
         stateids_bbox_positive.append(stateid_bbox_positive)
-    app.logger.debug(f"stateids_bbox_positive: {stateids_bbox_positive}")
+    app.logger.debug(f"{stateids_bbox_positive=}")
 
     # queue skills/infer-bbox for negative objects
     stateids_bbox_negative = []
@@ -45,25 +45,25 @@ async def process(
             url=f"infer-bbox/{stateid_input}",
             params={"product_name": name},
         )
-        app.logger.debug(f"stateid_bbox_negative: {stateid_bbox_negative}")
+        app.logger.debug(f"{stateid_bbox_negative=}")
         stateids_bbox_negative.append(stateid_bbox_negative)
-    app.logger.debug(f"stateids_bbox_negative: {stateids_bbox_negative}")
+    app.logger.debug(f"{stateids_bbox_negative=}")
 
     # queue skills/segment for positive objects
     stateids_mask_positive = []
     for stateid_bbox in stateids_bbox_positive:
         stateid_mask_positive = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
-        app.logger.debug(f"stateid_mask_positive: {stateid_mask_positive}")
+        app.logger.debug(f"{stateid_mask_positive=}")
         stateids_mask_positive.append(stateid_mask_positive)
-    app.logger.debug(f"stateids_mask_positive: {stateids_mask_positive}")
+    app.logger.debug(f"{stateids_mask_positive=}")
 
     # queue skills/segment for negative objects
     stateids_mask_negative = []
     for stateid_bbox in stateids_bbox_negative:
         stateid_mask_negative = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
-        app.logger.debug(f"stateid_mask_negative: {stateid_mask_negative}")
+        app.logger.debug(f"{stateid_mask_negative=}")
         stateids_mask_negative.append(stateid_mask_negative)
-    app.logger.debug(f"stateids_mask_negative: {stateids_mask_negative}")
+    app.logger.debug(f"{stateids_mask_negative=}")
 
     # queue skills/merge-masks for positive objects
     if len(stateids_mask_positive) == 1:
@@ -76,7 +76,7 @@ async def process(
                 "states": stateids_mask_positive,
             },
         )
-    app.logger.debug(f"stateid_mask_positive_union: {stateid_mask_positive_union}")
+    app.logger.debug(f"{stateid_mask_positive_union=}")
 
     # queue skills/merge-masks for negative objects
     if len(stateids_mask_negative) == 0:
@@ -91,7 +91,7 @@ async def process(
                 "states": stateids_mask_negative,
             },
         )
-    app.logger.debug(f"stateid_mask_negative_union: {stateid_mask_negative_union}")
+    app.logger.debug(f"{stateid_mask_negative_union=}")
 
     # queue skills/merge-masks for difference between positive and negative masks
     if stateid_mask_negative_union is not None:
@@ -104,14 +104,14 @@ async def process(
         )
     else:
         stateid_mask_difference = stateid_mask_positive_union
-    app.logger.debug(f"stateid_mask_difference: {stateid_mask_difference}")
+    app.logger.debug(f"{stateid_mask_difference=}")
 
     # queue skills/recolor
     stateid_recolor = await ctx.ensure_skill(
         url=f"recolor/{stateid_input}/{stateid_mask_difference}",
         params={"color": object_color},
     )
-    app.logger.debug(f"stateid_recolor: {stateid_recolor}")
+    app.logger.debug(f"{stateid_recolor=}")
 
     return stateid_recolor
 
@@ -119,9 +119,9 @@ async def process(
 async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"json payload: {input_json}")
+    app.logger.debug(f"{input_json=}")
     input_data = RecolorParams(**input_json)
-    app.logger.debug(f"parsed payload: {input_data}")
+    app.logger.debug(f"{input_data=}")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
@@ -134,7 +134,7 @@ async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
-    app.logger.debug(f"stateids_input: {stateids_input}")
+    app.logger.debug(f"{stateids_input=}")
 
     # validate object_colors
     if input_data.object_colors is None:
@@ -181,7 +181,7 @@ async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
             strict=True,
         )
     ]
-    app.logger.debug(f"stateids_recolor: {stateids_recolor}")
+    app.logger.debug(f"{stateids_recolor=}")
 
     # download the output images
     recolor_imgs = [
@@ -201,6 +201,6 @@ async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_output=stateids_recolor,
         stateids_undo=stateids_input,
     )
-    app.logger.debug(f"output payload: {output_data}")
+    app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response
