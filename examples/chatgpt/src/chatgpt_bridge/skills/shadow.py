@@ -38,10 +38,14 @@ async def process(
     app.logger.debug(f"{stateid_cutout=}")
 
     # queue skills/shadow
-    stateid_shadow = await ctx.skill_shadow(stateid_cutout=stateid_cutout, background_color=background_color)
+    stateid_shadow = await ctx.skill_shadow(stateid_cutout=stateid_cutout, background_color="transparent")
     app.logger.debug(f"{stateid_shadow=}")
 
-    return stateid_shadow
+    # queue skills/set-background-color
+    stateid_shadow_colorbg = await ctx.skill_set_bgcolor(stateid_image=stateid_shadow, color=background_color)
+    app.logger.debug(f"{stateid_shadow_colorbg=}")
+
+    return stateid_shadow_colorbg
 
 
 async def _shadow(ctx: EditorAPIContextCached, request: Request) -> Response:
