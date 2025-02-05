@@ -33,15 +33,15 @@ async def process(
         url=f"infer-bbox/{stateid_input}",
         params={"product_name": object_name},
     )
-    app.logger.debug(f"stateid_bbox: {stateid_bbox}")
+    app.logger.debug(f"{stateid_bbox=}")
 
     # queue skills/segment
     stateid_mask = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
-    app.logger.debug(f"stateid_mask: {stateid_mask}")
+    app.logger.debug(f"{stateid_mask=}")
 
     # queue skills/cutout
     stateid_cutout = await ctx.ensure_skill(url=f"cutout/{stateid_input}/{stateid_mask}")
-    app.logger.debug(f"stateid_cutout: {stateid_cutout}")
+    app.logger.debug(f"{stateid_cutout=}")
 
     # download cutout from API
     cutout = await download_image(ctx=ctx, stateid=stateid_cutout)
@@ -65,7 +65,7 @@ async def process(
     cutout_margin_data = io.BytesIO()
     cutout_margin.save(cutout_margin_data, format="JPEG")
     stateid_cutout_margin = await create_state(ctx, file=cutout_margin_data)
-    app.logger.debug(f"stateid_cutout_margin: {stateid_cutout_margin}")
+    app.logger.debug(f"{stateid_cutout_margin=}")
 
     return cutout_margin, stateid_cutout_margin
 
@@ -73,9 +73,9 @@ async def process(
 async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"json payload: {input_json}")
+    app.logger.debug(f"{input_json=}")
     input_data = CutoutParams(**input_json)
-    app.logger.debug(f"parsed payload: {input_data}")
+    app.logger.debug(f"{input_data=}")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
@@ -88,7 +88,7 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
-    app.logger.debug(f"stateids_input: {stateids_input}")
+    app.logger.debug(f"{stateids_input=}")
 
     # validate input data
     if input_data.object_names is None:
@@ -133,6 +133,6 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_undo=stateids_input,
         stateids_output=stateids_output,
     )
-    app.logger.debug(f"output_json: {output_data}")
+    app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response

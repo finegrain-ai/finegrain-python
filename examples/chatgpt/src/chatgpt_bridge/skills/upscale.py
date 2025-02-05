@@ -20,9 +20,9 @@ class UpscaleOutput(BaseModel):
 async def _upscale(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"json payload: {input_json}")
+    app.logger.debug(f"{input_json=}")
     input_data = UpscaleParams(**input_json)
-    app.logger.debug(f"parsed payload: {input_data}")
+    app.logger.debug(f"{input_data=}")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
@@ -35,14 +35,14 @@ async def _upscale(ctx: EditorAPIContext, request: Request) -> Response:
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
-    app.logger.debug(f"stateids_input: {stateids_input}")
+    app.logger.debug(f"{stateids_input=}")
 
     # queue skills/upscale
     stateids_upscaled = [
         await ctx.ensure_skill(url=f"upscale/{stateid_input}")  #
         for stateid_input in stateids_input
     ]
-    app.logger.debug(f"stateids_upscaled: {stateids_upscaled}")
+    app.logger.debug(f"{stateids_upscaled=}")
 
     # download output images
     upscaled_images = [
@@ -59,6 +59,6 @@ async def _upscale(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_output=stateids_upscaled,
         stateids_undo=stateids_input,
     )
-    app.logger.debug(f"output payload: {output_data}")
+    app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response

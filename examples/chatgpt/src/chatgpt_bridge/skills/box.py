@@ -26,7 +26,7 @@ async def process(
         url=f"infer-bbox/{stateid_input}",
         params={"product_name": object_name},
     )
-    app.logger.debug(f"stateid_bbox: {stateid_bbox}")
+    app.logger.debug(f"{stateid_bbox=}")
 
     # get bbox state/meta
     metadata_bbox = await ctx.get_meta(stateid_bbox)
@@ -38,9 +38,9 @@ async def process(
 async def _box(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"json payload: {input_json}")
+    app.logger.debug(f"{input_json=}")
     input_data = BoxParams(**input_json)
-    app.logger.debug(f"parsed payload: {input_data}")
+    app.logger.debug(f"{input_data=}")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
@@ -53,7 +53,7 @@ async def _box(ctx: EditorAPIContext, request: Request) -> Response:
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
-    app.logger.debug(f"stateids_input: {stateids_input}")
+    app.logger.debug(f"{stateids_input=}")
 
     # validate object_names
     if input_data.object_names is None:
@@ -78,6 +78,6 @@ async def _box(ctx: EditorAPIContext, request: Request) -> Response:
 
     # build output response
     output_data = BoxOutput(bounding_boxes=bounding_boxes)
-    app.logger.debug(f"output payload: {output_data}")
+    app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response
