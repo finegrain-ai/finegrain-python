@@ -23,7 +23,6 @@ paths:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
                 openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
               properties:
                 user_message:
                   type: string
@@ -35,7 +34,7 @@ paths:
                     type: string
                 stateids_input:
                   type: array
-                  description: List of API stateids to use, useful to chain edits
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
                   items:
                     type: string
       responses:
@@ -85,8 +84,8 @@ paths:
             schema:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names
+                and stateids_input (or openaiFileIdRefs) must have the same length.
               properties:
                 user_message:
                   type: string
@@ -103,7 +102,7 @@ paths:
                     type: string
                 stateids_input:
                   type: array
-                  description: List of API stateids to use, useful to chain edits
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
                   items:
                     type: string
       responses:
@@ -116,96 +115,12 @@ paths:
                 properties:
                   bounding_boxes:
                     type: array
-                    description: List of bounding boxes of the object in the image
+                    description: List of bounding boxes of the object in each image
                     items:
                       type: array
                       description: Bounding box coordinates (x1, y1, x2, y2)
                       items:
                         type: integer
-  /describe:
-    post:
-      operationId: describe
-      x-openai-isConsequential: false
-      summary: Infer the descriptions of images
-      description: The user uploads images or references stateids. The API returns the descriptions of the images.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
-              properties:
-                user_message:
-                  type: string
-                  description: The (verbatim) last message sent by the user, that triggered this action
-                openaiFileIdRefs:
-                  type: array
-                  description: List of images to process, uploaded by the user
-                  items:
-                    type: string
-                stateids_input:
-                  type: array
-                  description: List of API stateids to use, useful to chain edits
-                  items:
-                    type: string
-      responses:
-        "200":
-          description: Descriptions inferred successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  descriptions:
-                    type: array
-                    description: Descriptions of the product in the image
-                    items:
-                      type: string
-  /name:
-    post:
-      operationId: name
-      x-openai-isConsequential: false
-      summary: Infer the names of the objects in images
-      description: The user uploads images or references stateids. The API returns the names of the objects in images.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
-              properties:
-                user_message:
-                  type: string
-                  description: The (verbatim) last message sent by the user, that triggered this action
-                openaiFileIdRefs:
-                  type: array
-                  description: List of images to process, uploaded by the user
-                  items:
-                    type: string
-                stateids_input:
-                  type: array
-                  description: List of API stateids to use, useful to chain edits
-                  items:
-                    type: string
-      responses:
-        "200":
-          description: Name inferred successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  names:
-                    type: array
-                    description: Name of the product in the image
-                    items:
-                      type: string
   /cutout:
     post:
       operationId: cutout
@@ -221,8 +136,8 @@ paths:
             schema:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names,
+                background_colors and stateids_input (or openaiFileIdRefs) must have the same length.
               properties:
                 user_message:
                   type: string
@@ -234,7 +149,7 @@ paths:
                     type: string
                 background_colors:
                   type: array
-                  description: List of hex colors (#rrggbb) to fill the background with
+                  description: List of hex colors (#rrggbb) to fill the background of each image with
                   items:
                     type: string
                     default: "#ffffff"
@@ -245,7 +160,7 @@ paths:
                     type: string
                 stateids_input:
                   type: array
-                  description: List of API stateids to use, useful to chain edits
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
                   items:
                     type: string
       responses:
@@ -296,8 +211,8 @@ paths:
             schema:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names
+                and stateids_input (or openaiFileIdRefs) must have the same length.
               properties:
                 user_message:
                   type: string
@@ -307,7 +222,7 @@ paths:
                   description: List of list of objects to erase in each image
                   items:
                     type: array
-                    description: List of objects to erase in the image
+                    description: List of objects to erase in the associated image
                     items:
                       type: string
                 openaiFileIdRefs:
@@ -317,7 +232,7 @@ paths:
                     type: string
                 stateids_input:
                   type: array
-                  description: List of API stateids to use, useful to chain edits
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
                   items:
                     type: string
       responses:
@@ -369,7 +284,8 @@ paths:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
                 openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
+                positive_object_names, negative_object_names, object_colors and stateids_input (or openaiFileIdRefs)
+                must have the same length.
               properties:
                 user_message:
                   type: string
@@ -379,7 +295,7 @@ paths:
                   description: List of objects to recolor in each image
                   items:
                     type: array
-                    description: List of objects to recolor in the image
+                    description: List of objects to recolor in the associated image
                     items:
                       type: string
                 negative_object_names:
@@ -387,7 +303,7 @@ paths:
                   description: List of list of objects to not recolor in each image, leave empty if not explicitly referenced
                   items:
                     type: array
-                    description: List of objects to not recolor in the image
+                    description: List of objects to not recolor in the associated image
                     items:
                       type: string
                 object_colors:
@@ -402,7 +318,7 @@ paths:
                     type: string
                 stateids_input:
                   type: array
-                  description: List of API stateids to use, useful to chain edits
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
                   items:
                     type: string
       responses:
@@ -453,8 +369,8 @@ paths:
             schema:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                stateids_input comes from previous stateids_output or stateids_undo, depending on the user request.
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names,
+                background_colors and stateids_input (or openaiFileIdRefs) must have the same length.
               properties:
                 user_message:
                   type: string
@@ -477,7 +393,7 @@ paths:
                     type: string
                 stateids_input:
                   type: array
-                  description: List of API stateids to use, useful to chain edits
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
                   items:
                     type: string
       responses:
