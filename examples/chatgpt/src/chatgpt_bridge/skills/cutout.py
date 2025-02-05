@@ -1,12 +1,12 @@
 import io
 
-from finegrain import EditorAPIContext
 from PIL import Image
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, create_state, download_image, json_error
+from chatgpt_bridge.context import EditorAPIContextCached
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
 
 
 class CutoutParams(BaseModel):
@@ -23,28 +23,24 @@ class CutoutOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContext,
+    ctx: EditorAPIContextCached,
     stateid_input: StateID,
     background_color: str,
     object_name: str,
 ) -> tuple[Image.Image, StateID]:
     # queue skills/infer-bbox
-    stateid_bbox = await ctx.ensure_skill(
-        url=f"infer-bbox/{stateid_input}",
-        params={"product_name": object_name},
-    )
+    stateid_bbox = await ctx.skill_bbox(stateid_image=stateid_input, product_name=object_name)
     app.logger.debug(f"{stateid_bbox=}")
 
     # queue skills/segment
-    stateid_mask = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
+    stateid_mask = await ctx.skill_segment(stateid_bbox=stateid_bbox)
     app.logger.debug(f"{stateid_mask=}")
 
     # queue skills/cutout
-    stateid_cutout = await ctx.ensure_skill(url=f"cutout/{stateid_input}/{stateid_mask}")
+    stateid_cutout = await ctx.skill_cutout(stateid_image=stateid_input, stateid_mask=stateid_mask)
     app.logger.debug(f"{stateid_cutout=}")
 
-    # download cutout from API
-    cutout = await download_image(ctx=ctx, stateid=stateid_cutout)
+    cutout = await ctx.download_image(stateid_image=stateid_cutout)
 
     # paste cutout onto a blank image, with margins
     cutout_margin = Image.new(
@@ -64,13 +60,13 @@ async def process(
     # upload the cutout with margin to the API
     cutout_margin_data = io.BytesIO()
     cutout_margin.save(cutout_margin_data, format="JPEG")
-    stateid_cutout_margin = await create_state(ctx, file=cutout_margin_data)
+    stateid_cutout_margin = await ctx.create_state(file=cutout_margin_data)
     app.logger.debug(f"{stateid_cutout_margin=}")
 
     return cutout_margin, stateid_cutout_margin
 
 
-async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
+async def _cutout(ctx: EditorAPIContextCached, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -84,7 +80,7 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_input: list[str] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await create_state(ctx, oai_ref.download_link)
+                stateid_input = await ctx.create_state(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)

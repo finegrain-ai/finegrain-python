@@ -1,9 +1,9 @@
-from finegrain import EditorAPIContext
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, create_state, download_image, json_error
+from chatgpt_bridge.context import EditorAPIContextCached
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
 
 
 class ShadowParams(BaseModel):
@@ -20,36 +20,31 @@ class ShadowOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContext,
+    ctx: EditorAPIContextCached,
     stateid_input: StateID,
     object_name: str,
     background_color: str,
 ) -> StateID:
     # queue skills/infer-bbox
-    stateid_bbox = await ctx.ensure_skill(
-        url=f"infer-bbox/{stateid_input}",
-        params={"product_name": object_name},
-    )
+    stateid_bbox = await ctx.skill_bbox(stateid_image=stateid_input, product_name=object_name)
     app.logger.debug(f"{stateid_bbox=}")
 
     # queue skills/segment
-    stateid_mask = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
+    stateid_mask = await ctx.skill_segment(stateid_bbox=stateid_bbox)
     app.logger.debug(f"{stateid_mask=}")
 
     # queue skills/cutout
-    stateid_cutout = await ctx.ensure_skill(url=f"cutout/{stateid_input}/{stateid_mask}")
+    stateid_cutout = await ctx.skill_cutout(stateid_image=stateid_input, stateid_mask=stateid_mask)
     app.logger.debug(f"{stateid_cutout=}")
 
     # queue skills/shadow
-    stateid_shadow = await ctx.ensure_skill(
-        url=f"shadow/{stateid_cutout}",
-        params={"background": background_color},
-    )
+    stateid_shadow = await ctx.skill_shadow(stateid_cutout=stateid_cutout, background_color=background_color)
+    app.logger.debug(f"{stateid_shadow=}")
 
     return stateid_shadow
 
 
-async def _shadow(ctx: EditorAPIContext, request: Request) -> Response:
+async def _shadow(ctx: EditorAPIContextCached, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -63,7 +58,7 @@ async def _shadow(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_input: list[str] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await create_state(ctx, oai_ref.download_link)
+                stateid_input = await ctx.create_state(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
@@ -105,7 +100,7 @@ async def _shadow(ctx: EditorAPIContext, request: Request) -> Response:
 
     # download output images
     shadow_imgs = [
-        await download_image(ctx=ctx, stateid=stateid_shadow)  #
+        await ctx.download_image(stateid_image=stateid_shadow)  #
         for stateid_shadow in stateids_shadow
     ]
 

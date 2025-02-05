@@ -1,9 +1,9 @@
-from finegrain import EditorAPIContext
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, create_state, download_image, json_error
+from chatgpt_bridge.context import EditorAPIContextCached
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
 
 
 class UpscaleParams(BaseModel):
@@ -17,7 +17,7 @@ class UpscaleOutput(BaseModel):
     stateids_undo: list[StateID]
 
 
-async def _upscale(ctx: EditorAPIContext, request: Request) -> Response:
+async def _upscale(ctx: EditorAPIContextCached, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -31,7 +31,7 @@ async def _upscale(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_input: list[StateID] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await create_state(ctx, oai_ref.download_link)
+                stateid_input = await ctx.create_state(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
@@ -39,14 +39,14 @@ async def _upscale(ctx: EditorAPIContext, request: Request) -> Response:
 
     # queue skills/upscale
     stateids_upscaled = [
-        await ctx.ensure_skill(url=f"upscale/{stateid_input}")  #
+        await ctx.skill_upscale(stateid_image=stateid_input)  #
         for stateid_input in stateids_input
     ]
     app.logger.debug(f"{stateids_upscaled=}")
 
     # download output images
     upscaled_images = [
-        await download_image(ctx, stateid_upscaled)  #
+        await ctx.download_image(stateid_upscaled)  #
         for stateid_upscaled in stateids_upscaled
     ]
 

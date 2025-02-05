@@ -8,6 +8,7 @@ dependencies = [
     "pydantic>=2.10.5",
     "quart>=0.20.0",
     "pillow>=11.1.0",
+    "async-lru>=2.0.4",
 ]
 description = "Finegrain API ChatGPT bridge"
 name = "chatgpt-bridge"

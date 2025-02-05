@@ -1,9 +1,9 @@
-from finegrain import EditorAPIContext
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, create_state, download_image, json_error
+from chatgpt_bridge.context import EditorAPIContextCached
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
 
 
 class EraseParams(BaseModel):
@@ -19,17 +19,14 @@ class EraseOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContext,
+    ctx: EditorAPIContextCached,
     stateid_input: StateID,
     object_names: list[str],
 ) -> StateID:
     # queue skills/infer-bbox
     stateids_bbox = []
     for name in object_names:
-        stateid_bbox = await ctx.ensure_skill(
-            url=f"infer-bbox/{stateid_input}",
-            params={"product_name": name},
-        )
+        stateid_bbox = await ctx.skill_bbox(stateid_image=stateid_input, product_name=name)
         app.logger.debug(f"{stateid_bbox=}")
         stateids_bbox.append(stateid_bbox)
     app.logger.debug(f"{stateids_bbox=}")
@@ -37,7 +34,7 @@ async def process(
     # queue skills/segment
     stateids_mask = []
     for stateid_bbox in stateids_bbox:
-        stateid_mask = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
+        stateid_mask = await ctx.skill_segment(stateid_bbox=stateid_bbox)
         app.logger.debug(f"{stateid_mask=}")
         stateids_mask.append(stateid_mask)
     app.logger.debug(f"{stateids_mask=}")
@@ -46,26 +43,21 @@ async def process(
     if len(stateids_mask) == 1:
         stateid_mask_union = stateids_mask[0]
     else:
-        stateid_mask_union = await ctx.ensure_skill(
-            url="merge-masks",
-            params={
-                "operation": "union",
-                "states": stateids_mask,
-            },
-        )
+        stateid_mask_union = await ctx.skill_merge_masks(stateids=tuple(stateids_mask), operation="union")
     app.logger.debug(f"{stateid_mask_union=}")
 
     # queue skills/erase
-    stateid_erased = await ctx.ensure_skill(
-        url=f"erase/{stateid_input}/{stateid_mask_union}",
-        params={"mode": "free"},
+    stateid_erased = await ctx.skill_erase(
+        stateid_image=stateid_input,
+        stateid_mask=stateid_mask_union,
+        mode="free",
     )
     app.logger.debug(f"{stateid_erased=}")
 
     return stateid_erased
 
 
-async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
+async def _eraser(ctx: EditorAPIContextCached, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -79,7 +71,7 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_input: list[StateID] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await create_state(ctx, oai_ref.download_link)
+                stateid_input = await ctx.create_state(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
@@ -106,7 +98,7 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
 
     # download images from API
     erased_imgs = [
-        await download_image(ctx=ctx, stateid=stateid_erased_img)  #
+        await ctx.download_image(stateid_image=stateid_erased_img)  #
         for stateid_erased_img in stateids_erased
     ]
 

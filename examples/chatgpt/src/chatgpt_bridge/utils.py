@@ -2,7 +2,6 @@ import base64
 import io
 from functools import wraps
 
-from finegrain import EditorAPIContext
 from PIL import Image
 from pydantic import BaseModel
 from quart import Response, jsonify, request
@@ -30,46 +29,6 @@ def require_basic_auth_token(token: str):
         return decorated_function
 
     return decorator
-
-
-async def create_state(
-    ctx: EditorAPIContext,
-    file_url: str | None = None,
-    file: io.BytesIO | None = None,
-    timeout: float | None = None,
-) -> str:
-    assert file_url or file, "file_url or file is required"
-
-    response = await ctx.request(
-        method="POST",
-        url="state/create",
-        json={"priority": ctx.priority},
-        data={"file_url": file_url} if file_url else None,
-        files={"file": file} if file else None,
-    )
-    state_id = response.json()["state"]
-    status = await ctx.sse_await(state_id, timeout=timeout)
-    if status:
-        return state_id
-    meta = await ctx.get_meta(state_id)
-    raise RuntimeError(f"create_state failed with {state_id}: {meta}")
-
-
-async def download_image(
-    ctx: EditorAPIContext,
-    stateid: str,
-    image_format: str = "PNG",
-    image_resolution: str = "DISPLAY",
-) -> Image.Image:
-    response = await ctx.request(
-        method="GET",
-        url=f"state/image/{stateid}",
-        params={
-            "format": image_format,
-            "resolution": image_resolution,
-        },
-    )
-    return Image.open(io.BytesIO(response.content))
 
 
 def image_to_base64(

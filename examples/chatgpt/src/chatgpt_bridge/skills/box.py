@@ -1,9 +1,9 @@
-from finegrain import EditorAPIContext
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.utils import BoundingBox, OpenaiFileIdRef, StateID, create_state, json_error
+from chatgpt_bridge.context import EditorAPIContextCached
+from chatgpt_bridge.utils import BoundingBox, OpenaiFileIdRef, StateID, json_error
 
 
 class BoxParams(BaseModel):
@@ -17,15 +17,12 @@ class BoxOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContext,
+    ctx: EditorAPIContextCached,
     stateid_input: StateID,
     object_name: str,
 ) -> BoundingBox:
     # queue skills/infer-bbox
-    stateid_bbox = await ctx.ensure_skill(
-        url=f"infer-bbox/{stateid_input}",
-        params={"product_name": object_name},
-    )
+    stateid_bbox = await ctx.skill_bbox(stateid_image=stateid_input, product_name=object_name)
     app.logger.debug(f"{stateid_bbox=}")
 
     # get bbox state/meta
@@ -35,7 +32,7 @@ async def process(
     return bounding_box
 
 
-async def _box(ctx: EditorAPIContext, request: Request) -> Response:
+async def _box(ctx: EditorAPIContextCached, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -49,7 +46,7 @@ async def _box(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_input: list[StateID] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await create_state(ctx, oai_ref.download_link)
+                stateid_input = await ctx.create_state(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)

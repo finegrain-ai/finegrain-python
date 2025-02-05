@@ -1,9 +1,9 @@
-from finegrain import EditorAPIContext
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, create_state, download_image, json_error
+from chatgpt_bridge.context import EditorAPIContextCached
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
 
 
 class RecolorParams(BaseModel):
@@ -21,7 +21,7 @@ class RecolorOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContext,
+    ctx: EditorAPIContextCached,
     object_color: str,
     stateid_input: str,
     positive_object_names: list[str],
@@ -30,10 +30,7 @@ async def process(
     # queue skills/infer-bbox for positive objects
     stateids_bbox_positive = []
     for name in positive_object_names:
-        stateid_bbox_positive = await ctx.ensure_skill(
-            url=f"infer-bbox/{stateid_input}",
-            params={"product_name": name},
-        )
+        stateid_bbox_positive = await ctx.skill_bbox(stateid_image=stateid_input, product_name=name)
         app.logger.debug(f"{stateid_bbox_positive=}")
         stateids_bbox_positive.append(stateid_bbox_positive)
     app.logger.debug(f"{stateids_bbox_positive=}")
@@ -41,10 +38,7 @@ async def process(
     # queue skills/infer-bbox for negative objects
     stateids_bbox_negative = []
     for name in negative_object_names:
-        stateid_bbox_negative = await ctx.ensure_skill(
-            url=f"infer-bbox/{stateid_input}",
-            params={"product_name": name},
-        )
+        stateid_bbox_negative = await ctx.skill_bbox(stateid_image=stateid_input, product_name=name)
         app.logger.debug(f"{stateid_bbox_negative=}")
         stateids_bbox_negative.append(stateid_bbox_negative)
     app.logger.debug(f"{stateids_bbox_negative=}")
@@ -52,7 +46,7 @@ async def process(
     # queue skills/segment for positive objects
     stateids_mask_positive = []
     for stateid_bbox in stateids_bbox_positive:
-        stateid_mask_positive = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
+        stateid_mask_positive = await ctx.skill_segment(stateid_bbox=stateid_bbox)
         app.logger.debug(f"{stateid_mask_positive=}")
         stateids_mask_positive.append(stateid_mask_positive)
     app.logger.debug(f"{stateids_mask_positive=}")
@@ -60,7 +54,7 @@ async def process(
     # queue skills/segment for negative objects
     stateids_mask_negative = []
     for stateid_bbox in stateids_bbox_negative:
-        stateid_mask_negative = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
+        stateid_mask_negative = await ctx.skill_segment(stateid_bbox=stateid_bbox)
         app.logger.debug(f"{stateid_mask_negative=}")
         stateids_mask_negative.append(stateid_mask_negative)
     app.logger.debug(f"{stateids_mask_negative=}")
@@ -69,12 +63,9 @@ async def process(
     if len(stateids_mask_positive) == 1:
         stateid_mask_positive_union = stateids_mask_positive[0]
     else:
-        stateid_mask_positive_union = await ctx.ensure_skill(
-            url="merge-masks",
-            params={
-                "operation": "union",
-                "states": stateids_mask_positive,
-            },
+        stateid_mask_positive_union = await ctx.skill_merge_masks(
+            stateids=tuple(stateids_mask_positive),
+            operation="union",
         )
     app.logger.debug(f"{stateid_mask_positive_union=}")
 
@@ -84,39 +75,34 @@ async def process(
     elif len(stateids_mask_negative) == 1:
         stateid_mask_negative_union = stateids_mask_negative[0]
     else:
-        stateid_mask_negative_union = await ctx.ensure_skill(
-            url="merge-masks",
-            params={
-                "operation": "union",
-                "states": stateids_mask_negative,
-            },
+        stateid_mask_negative_union = await ctx.skill_merge_masks(
+            stateids=tuple(stateids_mask_negative),
+            operation="union",
         )
     app.logger.debug(f"{stateid_mask_negative_union=}")
 
     # queue skills/merge-masks for difference between positive and negative masks
     if stateid_mask_negative_union is not None:
-        stateid_mask_difference = await ctx.ensure_skill(
-            url="merge-masks",
-            params={
-                "operation": "difference",
-                "states": [stateid_mask_positive_union, stateid_mask_negative_union],
-            },
+        stateid_mask_difference = await ctx.skill_merge_masks(
+            stateids=(stateid_mask_positive_union, stateid_mask_negative_union),
+            operation="difference",
         )
     else:
         stateid_mask_difference = stateid_mask_positive_union
     app.logger.debug(f"{stateid_mask_difference=}")
 
     # queue skills/recolor
-    stateid_recolor = await ctx.ensure_skill(
-        url=f"recolor/{stateid_input}/{stateid_mask_difference}",
-        params={"color": object_color},
+    stateid_recolor = await ctx.skill_recolor(
+        stateid_image=stateid_input,
+        stateid_mask=stateid_mask_difference,
+        color=object_color,
     )
     app.logger.debug(f"{stateid_recolor=}")
 
     return stateid_recolor
 
 
-async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
+async def _recolor(ctx: EditorAPIContextCached, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -130,7 +116,7 @@ async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_input: list[str] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await create_state(ctx, oai_ref.download_link)
+                stateid_input = await ctx.create_state(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
@@ -185,7 +171,7 @@ async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
 
     # download the output images
     recolor_imgs = [
-        await download_image(ctx=ctx, stateid=stateid_recolor)  #
+        await ctx.download_image(stateid_image=stateid_recolor)  #
         for stateid_recolor in stateids_recolor
     ]
 
