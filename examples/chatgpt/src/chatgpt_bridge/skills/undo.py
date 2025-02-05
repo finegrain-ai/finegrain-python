@@ -18,9 +18,9 @@ class UndoOutput(BaseModel):
 async def _undo(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"json payload: {input_json}")
+    app.logger.debug(f"{input_json=}")
     input_data = UndoParams(**input_json)
-    app.logger.debug(f"parsed payload: {input_data}")
+    app.logger.debug(f"{input_data=}")
 
     # validate input data
     if not input_data.stateids_undo:
@@ -43,6 +43,6 @@ async def _undo(ctx: EditorAPIContext, request: Request) -> Response:
         ],
         stateids_output=input_data.stateids_undo,
     )
-    app.logger.debug(f"output payload: {output_data}")
+    app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response

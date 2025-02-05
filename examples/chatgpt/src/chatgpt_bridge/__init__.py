@@ -35,11 +35,11 @@ app = Quart(__name__)
 
 logging.basicConfig(level=LOGLEVEL)
 app.logger.setLevel(APP_LOGLEVEL)
-app.logger.info(f"LOGLEVEL: {LOGLEVEL}")
-app.logger.info(f"FG_API_URL: {FG_API_URL}")
-app.logger.info(f"FG_API_USER: {FG_API_USER}")
-app.logger.info(f"FG_API_TIMEOUT: {FG_API_TIMEOUT}")
-app.logger.info(f"FG_API_PRIORITY: {FG_API_PRIORITY}")
+app.logger.info(f"{LOGLEVEL=}")
+app.logger.info(f"{FG_API_URL=}")
+app.logger.info(f"{FG_API_USER=}")
+app.logger.info(f"{FG_API_TIMEOUT=}")
+app.logger.info(f"{FG_API_PRIORITY=}")
 
 
 @app.before_serving
@@ -59,12 +59,12 @@ async def sse_stop() -> None:
 
 @app.before_request
 async def log_request() -> None:
-    app.logger.debug(f"Incoming request: {request.method} {request.path}")
+    app.logger.debug(f"{request.method} {request.path=}")
 
 
 @app.errorhandler(RuntimeError)
 async def handle_runtime_error(error: RuntimeError) -> Response:
-    app.logger.error(f"RuntimeError: {error}")
+    app.logger.error(f"{error=}")
     return json_error(str(error))
 
 

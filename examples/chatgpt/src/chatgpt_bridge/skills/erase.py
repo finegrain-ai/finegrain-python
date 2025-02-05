@@ -30,17 +30,17 @@ async def process(
             url=f"infer-bbox/{stateid_input}",
             params={"product_name": name},
         )
-        app.logger.debug(f"stateid_bbox: {stateid_bbox}")
+        app.logger.debug(f"{stateid_bbox=}")
         stateids_bbox.append(stateid_bbox)
-    app.logger.debug(f"stateids_bbox: {stateids_bbox}")
+    app.logger.debug(f"{stateids_bbox=}")
 
     # queue skills/segment
     stateids_mask = []
     for stateid_bbox in stateids_bbox:
         stateid_mask = await ctx.ensure_skill(url=f"segment/{stateid_bbox}")
-        app.logger.debug(f"stateid_mask: {stateid_mask}")
+        app.logger.debug(f"{stateid_mask=}")
         stateids_mask.append(stateid_mask)
-    app.logger.debug(f"stateids_mask: {stateids_mask}")
+    app.logger.debug(f"{stateids_mask=}")
 
     # queue skills/merge-masks for positive objects
     if len(stateids_mask) == 1:
@@ -53,14 +53,14 @@ async def process(
                 "states": stateids_mask,
             },
         )
-    app.logger.debug(f"stateid_mask_positive: {stateid_mask_union}")
+    app.logger.debug(f"{stateid_mask_union=}")
 
     # queue skills/erase
     stateid_erased = await ctx.ensure_skill(
         url=f"erase/{stateid_input}/{stateid_mask_union}",
         params={"mode": "free"},
     )
-    app.logger.debug(f"stateid_erased: {stateid_erased}")
+    app.logger.debug(f"{stateid_erased=}")
 
     return stateid_erased
 
@@ -68,9 +68,9 @@ async def process(
 async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"json payload: {input_json}")
+    app.logger.debug(f"{input_json=}")
     input_data = EraseParams(**input_json)
-    app.logger.debug(f"parsed payload: {input_data}")
+    app.logger.debug(f"{input_data=}")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
@@ -83,7 +83,7 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
                 stateids_input.append(stateid_input)
     else:
         return json_error("stateids_input or openaiFileIdRefs is required", 400)
-    app.logger.debug(f"stateids_input: {stateids_input}")
+    app.logger.debug(f"{stateids_input=}")
 
     # validate the inputs
     if input_data.object_names is None:
@@ -102,7 +102,7 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
         await process(ctx, stateid_input, object_names)
         for stateid_input, object_names in zip(stateids_input, input_data.object_names, strict=True)
     ]
-    app.logger.debug(f"stateids_erased: {stateids_erased}")
+    app.logger.debug(f"{stateids_erased=}")
 
     # download images from API
     erased_imgs = [
@@ -122,6 +122,6 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_output=stateids_erased,
         stateids_undo=stateids_input,
     )
-    app.logger.debug(f"output payload: {output_data}")
+    app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response
