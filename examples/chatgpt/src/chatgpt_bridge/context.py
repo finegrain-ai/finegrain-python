@@ -131,3 +131,14 @@ class EditorAPIContextCached(EditorAPIContext):
         stateid_image: StateID,
     ) -> StateID:
         return await self.ensure_skill(url=f"upscale/{stateid_image}")
+
+    @alru_cache(maxsize=LRU_SIZE)
+    async def skill_set_bgcolor(
+        self,
+        stateid_image: StateID,
+        color: str,
+    ) -> StateID:
+        return await self.ensure_skill(
+            url=f"set-background-color/{stateid_image}",
+            params={"background": color},
+        )
