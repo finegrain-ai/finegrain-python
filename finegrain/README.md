@@ -23,7 +23,7 @@ async def co(ctx: EditorAPIContext, prompt: str, path_in: str, path_out: str) ->
 
     st_boxed = await ctx.ensure_skill(f"infer-bbox/{st_input}", {"product_name": prompt})
     st_mask = await ctx.ensure_skill(f"segment/{st_boxed}")
-    st_erased = await ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "free"})
+    st_erased = await ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "express"})
 
     response = await ctx.request(
         "GET",

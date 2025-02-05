@@ -139,7 +139,7 @@ async def _call_object_eraser(
         st_mask = st_masks[0]
     else:
         st_mask = await api_ctx.ensure_skill("merge-masks", {"operation": "union", "states": st_masks})
-    st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "free"})
+    st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "express"})
 
     response = await api_ctx.request(
         "GET",
