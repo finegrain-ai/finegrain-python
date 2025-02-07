@@ -270,9 +270,16 @@ async def erase(
     output_image = await _call_object_eraser(bot.api_ctx, input_image, primary_object, extra_objects)
     assert output_image.content_type == "image/jpeg"
     removed_objects = (primary_object, *extra_objects)
+    command_parts = [f"/erase primary_object='{primary_object}'"]
+    if next_object:
+        command_parts.append(f"next_object='{next_object}'")
+    if another_object:
+        command_parts.append(f"another_object='{another_object}'")
+    command_string = " ".join(command_parts)
     reply = (
         f"Here is your image and the version without '{_format_name_list(removed_objects)}'. "
-        f"{INFO_EMOJI} Generated with the API's express mode. Upgrade for higher quality."
+        f"{INFO_EMOJI} Generated with the API's express mode. Upgrade for higher quality. "
+        f"\n\nCommand:\n`{command_string}`"
     )
     await interaction.followup.send(
         reply,
@@ -296,8 +303,10 @@ async def cutout(interaction: discord.Interaction, attachment: discord.Attachmen
     await interaction.response.defer(thinking=True)
     output_image = await _call_object_cutter(bot.api_ctx, input_image, main_object)
     assert output_image.content_type == "image/png"
+    command_string = f"/cutout main_object='{main_object}'"
+    reply = f"Here is your image and the cutout for '{main_object}'.\n\nCommand:\n`{command_string}`"
     await interaction.followup.send(
-        f"Here is your image and the cutout for '{main_object}'.",
+        reply,
         files=(
             interaction.extras["input_file"],
             discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.png"),
