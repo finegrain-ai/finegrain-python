@@ -1,8 +1,10 @@
 import asyncio
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
 from textwrap import dedent
+from typing import Literal
 
 import discord
 from discord import Intents, app_commands
@@ -34,6 +36,10 @@ INFO_EMOJI = "\u2139\ufe0f"
 
 
 class UserInputError(app_commands.AppCommandError):
+    pass
+
+
+class NothingToEraseError(app_commands.AppCommandError):
     pass
 
 
@@ -100,6 +106,20 @@ class BotImage:
         )
 
 
+@dataclass
+class EraseTarget:
+    object_name: str
+    keep: bool = False  # aka do NOT erase, e.g. object in occlusion
+
+    @classmethod
+    def from_prompt(cls, prompt: str) -> "EraseTarget":
+        return cls(object_name=prompt[1:], keep=True) if prompt.startswith("!") else cls(object_name=prompt)
+
+    @property
+    def kind(self) -> Literal["keep", "erase"]:
+        return "keep" if self.keep else "erase"
+
+
 async def _ensure_infer_bbox(api_ctx: EditorAPIContext, state_id: str, prompt: str) -> str:
     url = f"infer-bbox/{state_id}"
     st_boxed, ok = await api_ctx.call_skill(url, {"product_name": prompt})
@@ -118,6 +138,17 @@ async def _ensure_segment(api_ctx: EditorAPIContext, state_id: str, prompt: str)
     return await api_ctx.ensure_skill(f"segment/{st_boxed}")
 
 
+async def _merge_masks(
+    api_ctx: EditorAPIContext, state_ids: list[str], operation: Literal["union", "difference"]
+) -> str:
+    assert state_ids, "expected at least one state ID for mask merging"
+    return (
+        state_ids[0]
+        if len(state_ids) == 1
+        else await api_ctx.ensure_skill("merge-masks", {"operation": operation, "states": state_ids})
+    )
+
+
 async def _call_object_eraser(
     api_ctx: EditorAPIContext, image: BotImage, prompt: str, extra_prompts: tuple[str, ...] = ()
 ) -> BotImage:
@@ -126,19 +157,36 @@ async def _call_object_eraser(
         response = await api_ctx.request("POST", "state/upload", files={"file": f})
     st_input = response.json()["state"]
 
-    all_prompts = (prompt, *extra_prompts)
+    targets = tuple(EraseTarget.from_prompt(p) for p in (prompt, *extra_prompts))
+    if all(target.keep for target in targets):
+        raise NothingToEraseError
+
     try:
         async with asyncio.TaskGroup() as tg:
-            segmentations = [tg.create_task(_ensure_segment(api_ctx, st_input, prompt)) for prompt in all_prompts]
+            segmentations = [
+                tg.create_task(_ensure_segment(api_ctx, st_input, target.object_name), name=target.kind)
+                for target in targets
+            ]
     except ExceptionGroup as eg:
         if not_found_errors := [exc for exc in eg.exceptions if isinstance(exc, ObjectNotFoundError)]:
             raise ObjectNotFoundError(_format_name_list(tuple(exc.prompt for exc in not_found_errors))) from eg
         raise
-    st_masks = [segmentation.result() for segmentation in segmentations]
-    if len(st_masks) == 1:
-        st_mask = st_masks[0]
+
+    if len(segmentations) == 1:
+        st_mask = segmentations[0].result()
     else:
-        st_mask = await api_ctx.ensure_skill("merge-masks", {"operation": "union", "states": st_masks})
+        results_by_type: defaultdict[str, list[str]] = defaultdict(list)
+        for task in segmentations:
+            results_by_type[task.get_name()].append(task.result())
+
+        st_erase_mask = await _merge_masks(api_ctx, results_by_type["erase"], operation="union")
+
+        if "keep" in results_by_type:
+            st_keep_mask = await _merge_masks(api_ctx, results_by_type["keep"], operation="union")
+            st_mask = await _merge_masks(api_ctx, [st_erase_mask, st_keep_mask], operation="difference")
+        else:
+            st_mask = st_erase_mask
+
     st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "express"})
 
     response = await api_ctx.request(
@@ -325,6 +373,8 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
     files: list[discord.File] = []
     if isinstance(error, UserInputError):
         reply = f"Oops! That file doesn't work \N{THINKING FACE}. {error}"
+    elif isinstance(error, NothingToEraseError):
+        reply = "Oops! Nothing to erase \N{SHRUG}. Please specify at least one object to erase (without a '!' prefix)."
     elif isinstance(error, ObjectNotFoundError):
         reply = (
             f"Oops! Couldn't find '{error.prompt}' in the image \N{LEFT-POINTING MAGNIFYING GLASS}. "
