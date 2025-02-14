@@ -2,15 +2,33 @@ import asyncio
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from io import BytesIO
 from textwrap import dedent
 from typing import Literal
 
 import discord
 from discord import Intents, app_commands
-from environs import Env
+from environs import Env, validate
 from finegrain import EditorAPIContext, Priority
 from PIL import Image
+
+
+class APIMode(Enum):
+    EXPRESS = "express"
+    STANDARD = "standard"
+    PREMIUM = "premium"
+
+    def info(self) -> str:
+        prefix = f"{INFO_EMOJI} Generated with the API's"
+        match self:
+            case APIMode.EXPRESS:
+                return f"{prefix} express mode. Upgrade for higher quality."
+            case APIMode.STANDARD:
+                return f"{prefix} standard mode. Go premium for even higher quality."
+            case APIMode.PREMIUM:
+                return f"{prefix} premium mode. Enjoy the highest quality."
+
 
 env = Env()
 env.read_env()
@@ -24,6 +42,9 @@ with env.prefixed("FG_"):
     API_USER: str | None = env.str("API_USER")
     API_PASSWORD: str | None = env.str("API_PASSWORD")
     API_VERIFY: str | bool = env.str("CA_BUNDLE", None) or True
+    API_ERASE_MODE: APIMode = APIMode(
+        env.str("API_ERASE_MODE", APIMode.EXPRESS.value, validate=validate.OneOf([mode.value for mode in APIMode]))
+    )
 LOGLEVEL = env.str("LOGLEVEL", "INFO").upper()
 LOGLEVEL_INT: int = logging.getLevelNamesMapping().get(LOGLEVEL, logging.INFO)
 
@@ -187,7 +208,7 @@ async def _call_object_eraser(
         else:
             st_mask = st_erase_mask
 
-    st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "express"})
+    st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": API_ERASE_MODE.value})
 
     response = await api_ctx.request(
         "GET",
@@ -325,8 +346,7 @@ async def erase(
         command_parts.append(f"another_object='{another_object}'")
     command_string = " ".join(command_parts)
     reply = (
-        f"Here is your image and the version without '{_format_name_list(removed_objects)}'. "
-        f"{INFO_EMOJI} Generated with the API's express mode. Upgrade for higher quality. "
+        f"Here is your image and the version without '{_format_name_list(removed_objects)}'. {API_ERASE_MODE.info()}"
         f"\n\nCommand:\n`{command_string}`"
     )
     await interaction.followup.send(
@@ -396,6 +416,7 @@ async def start_bot(reconnect: bool = True, debug: bool = False) -> None:
     assert DISCORD_TOKEN is not None
     # NOTE: `root=True` means it will affect all loggers rather than just the discord logger, httpx included.
     discord.utils.setup_logging(level=LOGLEVEL_INT, root=True)
+    _log.info(f"API erase mode: {API_ERASE_MODE.value}")
     if debug:
         import aiomonitor
 
