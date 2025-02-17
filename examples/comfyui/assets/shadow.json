@@ -1,0 +1,625 @@
+{
+  "last_node_id": 103,
+  "last_link_id": 206,
+  "nodes": [
+    {
+      "id": 13,
+      "type": "LoadImage",
+      "pos": [
+        140,
+        400
+      ],
+      "size": [
+        300,
+        550
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            64,
+            181,
+            182,
+            199
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "potted-plant.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 22,
+      "type": "Box",
+      "pos": [
+        460,
+        230
+      ],
+      "size": [
+        320,
+        78
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "api",
+          "type": "FG_API",
+          "link": 180
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 181
+        }
+      ],
+      "outputs": [
+        {
+          "name": "bbox",
+          "type": "BBOX",
+          "links": [
+            61,
+            152,
+            203
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Box"
+      },
+      "widgets_values": [
+        "cup of coffee"
+      ]
+    },
+    {
+      "id": 24,
+      "type": "PreviewImage",
+      "pos": [
+        460,
+        490
+      ],
+      "size": [
+        320,
+        510
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 62
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 38,
+      "type": "Draw Bounding Box",
+      "pos": [
+        460,
+        350
+      ],
+      "size": [
+        320,
+        102
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 64
+        },
+        {
+          "name": "bbox",
+          "type": "BBOX",
+          "link": 61
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            62
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Draw Bounding Box"
+      },
+      "widgets_values": [
+        "red",
+        3
+      ]
+    },
+    {
+      "id": 76,
+      "type": "Segment",
+      "pos": [
+        800,
+        230
+      ],
+      "size": [
+        320,
+        98
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "api",
+          "type": "FG_API",
+          "link": 184
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 182
+        },
+        {
+          "name": "bbox",
+          "type": "BBOX",
+          "link": 152
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            155,
+            200
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Segment"
+      },
+      "widgets_values": [
+        false
+      ]
+    },
+    {
+      "id": 77,
+      "type": "MaskToImage",
+      "pos": [
+        800,
+        370
+      ],
+      "size": [
+        320,
+        26
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 155
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            156
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MaskToImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 78,
+      "type": "PreviewImage",
+      "pos": [
+        800,
+        440
+      ],
+      "size": [
+        320,
+        510
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 156
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 88,
+      "type": "Finegrain API",
+      "pos": [
+        140,
+        230
+      ],
+      "size": [
+        300,
+        130
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "api",
+          "type": "FG_API",
+          "links": [
+            180,
+            184,
+            205
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Finegrain API"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "low",
+        60
+      ]
+    },
+    {
+      "id": 99,
+      "type": "Apply Mask to Image",
+      "pos": [
+        1140,
+        230
+      ],
+      "size": [
+        320,
+        46
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 199
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 200
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            201
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Apply Mask to Image"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 100,
+      "type": "Crop Image to Bounding Box",
+      "pos": [
+        1140,
+        320
+      ],
+      "size": [
+        320,
+        46
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 201
+        },
+        {
+          "name": "bbox",
+          "type": "BBOX",
+          "link": 203
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            204
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Crop Image to Bounding Box"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 102,
+      "type": "Shadow",
+      "pos": [
+        1140,
+        410
+      ],
+      "size": [
+        320,
+        194
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "api",
+          "type": "FG_API",
+          "link": 205
+        },
+        {
+          "name": "cutout",
+          "type": "IMAGE",
+          "link": 204
+        },
+        {
+          "name": "bbox",
+          "type": "BBOX",
+          "shape": 7,
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            206
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Shadow"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        1,
+        "fixed",
+        "#f38ba8"
+      ]
+    },
+    {
+      "id": 103,
+      "type": "PreviewImage",
+      "pos": [
+        1140,
+        650
+      ],
+      "size": [
+        320,
+        360
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 206
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      61,
+      22,
+      0,
+      38,
+      1,
+      "BBOX"
+    ],
+    [
+      62,
+      38,
+      0,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      64,
+      13,
+      0,
+      38,
+      0,
+      "IMAGE"
+    ],
+    [
+      152,
+      22,
+      0,
+      76,
+      2,
+      "BBOX"
+    ],
+    [
+      155,
+      76,
+      0,
+      77,
+      0,
+      "MASK"
+    ],
+    [
+      156,
+      77,
+      0,
+      78,
+      0,
+      "IMAGE"
+    ],
+    [
+      180,
+      88,
+      0,
+      22,
+      0,
+      "FG_API"
+    ],
+    [
+      181,
+      13,
+      0,
+      22,
+      1,
+      "IMAGE"
+    ],
+    [
+      182,
+      13,
+      0,
+      76,
+      1,
+      "IMAGE"
+    ],
+    [
+      184,
+      88,
+      0,
+      76,
+      0,
+      "FG_API"
+    ],
+    [
+      199,
+      13,
+      0,
+      99,
+      0,
+      "IMAGE"
+    ],
+    [
+      200,
+      76,
+      0,
+      99,
+      1,
+      "MASK"
+    ],
+    [
+      201,
+      99,
+      0,
+      100,
+      0,
+      "IMAGE"
+    ],
+    [
+      203,
+      22,
+      0,
+      100,
+      1,
+      "BBOX"
+    ],
+    [
+      204,
+      100,
+      0,
+      102,
+      1,
+      "IMAGE"
+    ],
+    [
+      205,
+      88,
+      0,
+      102,
+      0,
+      "FG_API"
+    ],
+    [
+      206,
+      102,
+      0,
+      103,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.22845973573675,
+      "offset": [
+        -51.48501755999546,
+        -141.54638995866998
+      ]
+    }
+  },
+  "version": 0.4
+}
