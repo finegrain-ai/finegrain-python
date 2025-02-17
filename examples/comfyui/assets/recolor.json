@@ -40,7 +40,7 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "potted-plant.jpg",
+        "2149178361.jpg",
         "image"
       ]
     },
@@ -85,7 +85,7 @@
         "Node name for S&R": "Box"
       },
       "widgets_values": [
-        "cup of coffee"
+        "chair"
       ]
     },
     {
@@ -353,7 +353,7 @@
         "Node name for S&R": "Recolor"
       },
       "widgets_values": [
-        "#f38ba8"
+        "#45475a"
       ]
     },
     {
@@ -380,7 +380,8 @@
       "outputs": [],
       "properties": {
         "Node name for S&R": "PreviewImage"
-      }
+      },
+      "widgets_values": []
     }
   ],
   "links": [
