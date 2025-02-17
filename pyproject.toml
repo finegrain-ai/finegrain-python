@@ -1,0 +1,14 @@
+[project]
+name = "finegrain-python"
+description = ""
+version = "1.0.0"
+license = {file = "LICENSE"}
+
+[project.urls]
+Repository = "https://github.com/finegrain-ai/finegrain-python"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "finegrain-python"
+Icon = ""
