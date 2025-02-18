@@ -83,8 +83,6 @@ class Eraser:
                         "tooltip": "The mask of the object to erase",
                     },
                 ),
-            },
-            "optional": {
                 "mode": (
                     [
                         "express",
@@ -92,6 +90,8 @@ class Eraser:
                         "premium",
                     ],
                 ),
+            },
+            "optional": {
                 "seed": (
                     "INT",
                     {

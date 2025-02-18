@@ -193,7 +193,13 @@ class API:
                         "tooltip": "The Finegrain API password",
                     },
                 ),
-                "priority": (["low", "standard", "high"],),
+                "priority": (
+                    [
+                        "standard",
+                        "low",
+                        "high",
+                    ],
+                ),
                 "timeout": (
                     "INT",
                     {

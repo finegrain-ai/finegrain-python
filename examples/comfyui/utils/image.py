@@ -57,7 +57,7 @@ class ApplyMaskToImage:
                 "image": (
                     "IMAGE",
                     {
-                        "tooltip": "The image to apply the mask to.",
+                        "tooltip": "The RGB image to apply the mask to.",
                     },
                 ),
                 "mask": (
@@ -82,5 +82,8 @@ class ApplyMaskToImage:
         image: torch.Tensor,
         mask: torch.Tensor,
     ) -> tuple[torch.Tensor]:
+        assert image.shape[-1] == 3, "Image must be in RGB mode"
+        assert mask.shape[-1] == 1, "Mask must be in L mode"
+
         image = torch.cat((image, mask.unsqueeze(-1)), dim=-1)
         return (image,)

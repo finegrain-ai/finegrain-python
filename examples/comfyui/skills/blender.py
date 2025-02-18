@@ -93,8 +93,6 @@ class Blender:
                         "tooltip": "Bounding box of where to place the cutout in the scene.",
                     },
                 ),
-            },
-            "optional": {
                 "mode": (
                     [
                         "express",
@@ -102,6 +100,8 @@ class Blender:
                         "premium",
                     ],
                 ),
+            },
+            "optional": {
                 "flip": (
                     "BOOLEAN",
                     {

@@ -6,7 +6,7 @@ Finegrain API ComfyUI custom nodes
 
 ### Requirements
 
-1. Ensure you have Python 3.10 or later installed.
+1. Ensure you have Python 3.12 or later installed.
 
 2. Ensure you have Git installed.
 
@@ -23,10 +23,10 @@ comfy node registry-install comfyui-finegrain
 2. Ensure the requirements are installed:
 
 ```bash
-pip install -r custom_nodes/comfyui-finegrain/requirements.tx
+pip install -r custom_nodes/comfyui-finegrain/requirements.txt
 ```
 
-## Manual installation
+### Manual installation
 
 To manually install the nodes, you may alternatively do the following:
 
