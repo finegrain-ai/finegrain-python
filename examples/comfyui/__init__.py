@@ -20,7 +20,7 @@ from .skills.shadow import Shadow
 from .skills.upscale import Upscale
 from .utils.bbox import CreateBoundingBox, DrawBoundingBox, ImageCropBoundingBox, MaskCropBoundingBox
 from .utils.context import API
-from .utils.image import ApplyMaskToImage
+from .utils.image import ApplyTransparencyMask
 
 NODE_CLASS_MAPPINGS: dict[str, Any] = {
     c.TITLE: c
@@ -50,8 +50,8 @@ NODE_CLASS_MAPPINGS: dict[str, Any] = {
         DrawBoundingBox,
         ImageCropBoundingBox,
         MaskCropBoundingBox,
+        ApplyTransparencyMask,
         API,
-        ApplyMaskToImage,
     ]
 }
 

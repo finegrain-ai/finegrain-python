@@ -49,7 +49,7 @@ def image_to_bytes(image: Image.Image) -> io.BytesIO:
     return data
 
 
-class ApplyMaskToImage:
+class ApplyTransparencyMask:
     @classmethod
     def INPUT_TYPES(cls) -> dict[str, Any]:
         return {
@@ -72,8 +72,8 @@ class ApplyMaskToImage:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
 
-    TITLE = "Apply Mask to Image"
-    DESCRIPTION = "Apply a mask to an RGB image, combining them into a single RGBA image."
+    TITLE = "Apply Transparency Mask to Image"
+    DESCRIPTION = "Apply a transparency mask to an RGB image, combining them into a single RGBA image."
     CATEGORY = "Finegrain/image"
     FUNCTION = "process"
 
