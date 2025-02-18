@@ -1,6 +1,6 @@
 {
-  "last_node_id": 103,
-  "last_link_id": 206,
+  "last_node_id": 104,
+  "last_link_id": 210,
   "nodes": [
     {
       "id": 13,
@@ -25,7 +25,7 @@
             64,
             181,
             182,
-            199
+            209
           ],
           "slot_index": 0
         },
@@ -197,7 +197,7 @@
           "type": "MASK",
           "links": [
             155,
-            200
+            208
           ],
           "slot_index": 0
         }
@@ -310,47 +310,6 @@
       ]
     },
     {
-      "id": 99,
-      "type": "Apply Mask to Image",
-      "pos": [
-        1140,
-        230
-      ],
-      "size": [
-        320,
-        46
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 199
-        },
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 200
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            201
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Apply Mask to Image"
-      },
-      "widgets_values": []
-    },
-    {
       "id": 100,
       "type": "Crop Image to Bounding Box",
       "pos": [
@@ -368,7 +327,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 201
+          "link": 210
         },
         {
           "name": "bbox",
@@ -470,6 +429,46 @@
         "Node name for S&R": "PreviewImage"
       },
       "widgets_values": []
+    },
+    {
+      "id": 104,
+      "type": "Apply Transparency Mask to Image",
+      "pos": [
+        1140,
+        230
+      ],
+      "size": [
+        320,
+        46
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 209
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 208
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            210
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Apply Transparency Mask to Image"
+      }
     }
   ],
   "links": [
@@ -554,30 +553,6 @@
       "FG_API"
     ],
     [
-      199,
-      13,
-      0,
-      99,
-      0,
-      "IMAGE"
-    ],
-    [
-      200,
-      76,
-      0,
-      99,
-      1,
-      "MASK"
-    ],
-    [
-      201,
-      99,
-      0,
-      100,
-      0,
-      "IMAGE"
-    ],
-    [
       203,
       22,
       0,
@@ -606,6 +581,30 @@
       102,
       0,
       103,
+      0,
+      "IMAGE"
+    ],
+    [
+      208,
+      76,
+      0,
+      104,
+      1,
+      "MASK"
+    ],
+    [
+      209,
+      13,
+      0,
+      104,
+      0,
+      "IMAGE"
+    ],
+    [
+      210,
+      104,
+      0,
+      100,
       0,
       "IMAGE"
     ]
