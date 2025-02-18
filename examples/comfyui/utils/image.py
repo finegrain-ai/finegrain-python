@@ -82,8 +82,9 @@ class ApplyTransparencyMask:
         image: torch.Tensor,
         mask: torch.Tensor,
     ) -> tuple[torch.Tensor]:
+        assert image.ndim == 4, "Image must be 4D"
         assert image.shape[-1] == 3, "Image must be in RGB mode"
-        assert mask.shape[-1] == 1, "Mask must be in L mode"
+        assert mask.ndim == 3, "Mask must be 3D"
 
         image = torch.cat((image, mask.unsqueeze(-1)), dim=-1)
         return (image,)
