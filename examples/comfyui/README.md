@@ -1,12 +1,12 @@
 # finegrain-comfyui
 
-Finegrain API ComfyUI custom nodes
+[Finegrain API](https://api.finegrain.ai/doc/) ComfyUI custom nodes
 
 ## Installation
 
 ### Requirements
 
-1. Ensure you have Python 3.12 or later installed.
+1. Ensure you have **Python 3.12** or later installed.
 
 2. Ensure you have Git installed.
 
