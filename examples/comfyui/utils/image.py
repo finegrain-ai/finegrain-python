@@ -73,7 +73,7 @@ class ApplyMaskToImage:
     RETURN_NAMES = ("image",)
 
     TITLE = "Apply Mask to Image"
-    DESCRIPTION = "Apply a mask to an image."
+    DESCRIPTION = "Apply a mask to an RGB image, combining them into a single RGBA image."
     CATEGORY = "Finegrain/image"
     FUNCTION = "process"
 
