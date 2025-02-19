@@ -1,4 +1,4 @@
-# finegrain-comfyui
+# comfyui-finegrain
 
 [Finegrain API](https://api.finegrain.ai/doc/) ComfyUI custom nodes
 
