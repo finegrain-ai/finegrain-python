@@ -14,16 +14,27 @@
 
 The nodes are published at https://registry.comfy.org/publishers/finegrain/nodes/comfyui-finegrain.
 
-1. Install the nodes using the Comfy CLI:
+1. Ensure you have Comfy CLI installed.
+
+2. Install the custom nodes using Comfy CLI:
 
 ```bash
 comfy node registry-install comfyui-finegrain
 ```
 
-2. Ensure the requirements are installed:
+The above command should automatically install the nodes' requirements.
+If it somehow doesn't, you can manually install them with:
 
 ```bash
+# ensure you activated the python virtual environment used by ComfyUI
 pip install -r custom_nodes/comfyui-finegrain/requirements.txt
+```
+
+Alternatively if you installed ComfyUI via the "Windows Standalone archive", you can install the requirements with:
+
+```shell
+.\python_embeded\Scripts\pip.exe install hatchling
+.\python_embeded\Scripts\pip.exe install -r .\ComfyUI\custom_nodes\comfyui-finegrain\requirements.txt
 ```
 
 ### Manual installation
@@ -44,6 +55,13 @@ rm comfyui-finegrain.zip
 
 ```bash
 pip install -r custom_nodes/comfyui-finegrain/requirements.txt
+```
+
+Alternatively if you installed ComfyUI via the "Windows Standalone archive", you can install the requirements with:
+
+```shell
+.\python_embeded\Scripts\pip.exe install hatchling
+.\python_embeded\Scripts\pip.exe install -r .\ComfyUI\custom_nodes\comfyui-finegrain\requirements.txt
 ```
 
 ## Workflow examples
