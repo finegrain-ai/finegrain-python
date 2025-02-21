@@ -10,7 +10,7 @@ Here is an example script to erase an object from an image by prompt.
 import argparse
 import asyncio
 
-from finegrain import EditorAPIContext
+from finegrain import EditorAPIContext, EraseResultWithImage, ErrorResult
 
 
 async def co(ctx: EditorAPIContext, prompt: str, path_in: str, path_out: str) -> None:
@@ -18,21 +18,21 @@ async def co(ctx: EditorAPIContext, prompt: str, path_in: str, path_out: str) ->
     await ctx.sse_start()
 
     with open(path_in, "rb") as f:
-        response = await ctx.request("POST", "state/upload", files={"file": f})
-    st_input = response.json()["state"]
+        st_input = await ctx.call_async.upload_image(f)
 
-    st_boxed = await ctx.ensure_skill(f"infer-bbox/{st_input}", {"product_name": prompt})
-    st_mask = await ctx.ensure_skill(f"segment/{st_boxed}")
-    st_erased = await ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "express"})
+    bbox_r = await ctx.call_async.infer_bbox(st_input, prompt)
+    assert not isinstance(bbox_r, ErrorResult)
+    print(f"Got bounding box: {bbox_r.bbox}")
 
-    response = await ctx.request(
-        "GET",
-        f"state/image/{st_erased}",
-        params={"format": "WEBP", "resolution": "DISPLAY"},
-    )
+    mask_r = await ctx.call_async.segment(bbox_r.state_id)
+    assert not isinstance(mask_r, ErrorResult)
+
+    erased_r = await ctx.call_async.erase(st_input, mask_r.state_id, mode="express", with_image=True)
+    assert isinstance(erased_r, EraseResultWithImage)
 
     with open(path_out, "wb") as f:
-        f.write(response.content)
+        f.write(erased_r.image)
+    print(f"Output image in {path_out}")
 
     await ctx.sse_stop()
 
