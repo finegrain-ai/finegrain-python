@@ -47,6 +47,14 @@ class EditorAPIContext(_EditorAPIContext):
         )
         return Image.open(io.BytesIO(response.content))
 
+    async def skill_infer_main_subject(
+        self,
+        stateid_image: StateID,
+    ) -> StateID:
+        return await self.ensure_skill(
+            url=f"infer-main-subject/{stateid_image}",
+        )
+
     async def skill_bbox(
         self,
         stateid_image: StateID,
@@ -203,7 +211,7 @@ class API:
                 "timeout": (
                     "INT",
                     {
-                        "default": 60,
+                        "default": 120,
                         "tooltip": "The default timeout in seconds for each HTTP requests",
                     },
                 ),

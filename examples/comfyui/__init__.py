@@ -14,6 +14,7 @@ from .advanced.upscale import AdvancedUpscale
 from .skills.blender import Blender
 from .skills.box import Box
 from .skills.eraser import Eraser
+from .skills.name import InferMainSubject
 from .skills.recolor import Recolor
 from .skills.segment import Segment
 from .skills.shadow import Shadow
@@ -41,6 +42,7 @@ NODE_CLASS_MAPPINGS: dict[str, Any] = {
         Blender,
         Box,
         Eraser,
+        InferMainSubject,
         Recolor,
         Segment,
         Shadow,
