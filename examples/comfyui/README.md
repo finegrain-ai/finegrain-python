@@ -2,6 +2,17 @@
 
 [Finegrain API](https://api.finegrain.ai/doc/) ComfyUI custom nodes
 
+## Account creation (Prerequisite)
+
+To use these custom nodes, you need Finegrain API credentials:
+
+1. Sign up for an account at https://editor.finegrain.ai/signup.
+
+2. Use your **username** (email) and **password** in the `Finegrain API` node.
+
+> [!Note]
+> Behind the scenes, authentication is handled by the Finegrain Python client, so you don't need to manage [API tokens](https://api.finegrain.ai/doc/authentication/) manually.
+
 ## Installation
 
 ### Requirements
@@ -14,7 +25,7 @@
 
 The nodes are published at https://registry.comfy.org/publishers/finegrain/nodes/comfyui-finegrain.
 
-1. Ensure you have Comfy CLI installed.
+1. Ensure you have [Comfy CLI](https://docs.comfy.org/comfy-cli/getting-started) installed.
 
 2. Install the custom nodes using Comfy CLI:
 
