@@ -1,17 +1,17 @@
 {
-  "last_node_id": 102,
-  "last_link_id": 207,
+  "last_node_id": 108,
+  "last_link_id": 220,
   "nodes": [
     {
       "id": 13,
       "type": "LoadImage",
       "pos": [
-        140,
-        400
+        100,
+        410
       ],
       "size": [
         300,
-        550
+        560
       ],
       "flags": {},
       "order": 0,
@@ -25,7 +25,7 @@
             64,
             181,
             182,
-            206
+            216
           ],
           "slot_index": 0
         },
@@ -40,7 +40,7 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "potted-plant.jpg",
+        "plant.jpg",
         "image"
       ]
     },
@@ -48,12 +48,12 @@
       "id": 22,
       "type": "Box",
       "pos": [
-        460,
+        420,
         230
       ],
       "size": [
-        320,
-        78
+        300,
+        80
       ],
       "flags": {},
       "order": 2,
@@ -77,7 +77,7 @@
           "links": [
             61,
             152,
-            203
+            217
           ],
           "slot_index": 0
         }
@@ -86,46 +86,19 @@
         "Node name for S&R": "Box"
       },
       "widgets_values": [
-        "cup of coffee"
+        "potted plant"
       ]
-    },
-    {
-      "id": 24,
-      "type": "PreviewImage",
-      "pos": [
-        460,
-        490
-      ],
-      "size": [
-        320,
-        510
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 62
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": []
     },
     {
       "id": 38,
       "type": "Draw Bounding Box",
       "pos": [
-        460,
-        350
+        420,
+        360
       ],
       "size": [
-        320,
-        102
+        300,
+        110
       ],
       "flags": {},
       "order": 3,
@@ -147,7 +120,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            62
+            199
           ],
           "slot_index": 0
         }
@@ -157,19 +130,19 @@
       },
       "widgets_values": [
         "red",
-        3
+        5
       ]
     },
     {
       "id": 76,
       "type": "Segment",
       "pos": [
-        800,
+        740,
         230
       ],
       "size": [
-        320,
-        98
+        300,
+        100
       ],
       "flags": {},
       "order": 4,
@@ -197,7 +170,7 @@
           "type": "MASK",
           "links": [
             155,
-            205
+            215
           ],
           "slot_index": 0
         }
@@ -213,12 +186,12 @@
       "id": 77,
       "type": "MaskToImage",
       "pos": [
-        800,
-        370
+        740,
+        380
       ],
       "size": [
-        320,
-        26
+        300,
+        30
       ],
       "flags": {},
       "order": 6,
@@ -235,7 +208,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            156
+            200
           ],
           "slot_index": 0
         }
@@ -249,12 +222,12 @@
       "id": 78,
       "type": "PreviewImage",
       "pos": [
-        800,
-        440
+        740,
+        460
       ],
       "size": [
-        320,
-        510
+        300,
+        490
       ],
       "flags": {},
       "order": 8,
@@ -263,7 +236,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 156
+          "link": 200
         }
       ],
       "outputs": [],
@@ -276,7 +249,7 @@
       "id": 88,
       "type": "Finegrain API",
       "pos": [
-        140,
+        100,
         230
       ],
       "size": [
@@ -304,20 +277,47 @@
       "widgets_values": [
         "",
         "",
-        "low",
+        "standard",
         60
       ]
     },
     {
       "id": 100,
-      "type": "Crop Image to Bounding Box",
+      "type": "PreviewImage",
       "pos": [
-        1140,
-        320
+        420,
+        520
       ],
       "size": [
-        320,
-        46
+        300,
+        490
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 199
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 105,
+      "type": "Crop Image to Bounding Box",
+      "pos": [
+        1060,
+        330
+      ],
+      "size": [
+        300,
+        50
       ],
       "flags": {},
       "order": 9,
@@ -326,12 +326,12 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 207
+          "link": 213
         },
         {
           "name": "bbox",
           "type": "BBOX",
-          "link": 203
+          "link": 217
         }
       ],
       "outputs": [
@@ -339,7 +339,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            202
+            214
           ],
           "slot_index": 0
         }
@@ -350,15 +350,15 @@
       "widgets_values": []
     },
     {
-      "id": 101,
+      "id": 106,
       "type": "PreviewImage",
       "pos": [
-        1140,
-        410
+        1060,
+        430
       ],
       "size": [
-        320,
-        270
+        300,
+        300
       ],
       "flags": {},
       "order": 10,
@@ -367,7 +367,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 202
+          "link": 214
         }
       ],
       "outputs": [],
@@ -377,15 +377,15 @@
       "widgets_values": []
     },
     {
-      "id": 102,
+      "id": 107,
       "type": "Apply Transparency Mask to Image",
       "pos": [
-        1140,
+        1060,
         230
       ],
       "size": [
-        320,
-        46
+        300,
+        50
       ],
       "flags": {},
       "order": 7,
@@ -394,12 +394,12 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 206
+          "link": 216
         },
         {
           "name": "mask",
           "type": "MASK",
-          "link": 205
+          "link": 215
         }
       ],
       "outputs": [
@@ -407,7 +407,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            207
+            213
           ],
           "slot_index": 0
         }
@@ -426,14 +426,6 @@
       38,
       1,
       "BBOX"
-    ],
-    [
-      62,
-      38,
-      0,
-      24,
-      0,
-      "IMAGE"
     ],
     [
       64,
@@ -458,14 +450,6 @@
       77,
       0,
       "MASK"
-    ],
-    [
-      156,
-      77,
-      0,
-      78,
-      0,
-      "IMAGE"
     ],
     [
       180,
@@ -500,44 +484,60 @@
       "FG_API"
     ],
     [
-      202,
-      100,
+      199,
+      38,
       0,
-      101,
+      100,
       0,
       "IMAGE"
     ],
     [
-      203,
-      22,
+      200,
+      77,
       0,
-      100,
-      1,
-      "BBOX"
+      78,
+      0,
+      "IMAGE"
     ],
     [
-      205,
+      213,
+      107,
+      0,
+      105,
+      0,
+      "IMAGE"
+    ],
+    [
+      214,
+      105,
+      0,
+      106,
+      0,
+      "IMAGE"
+    ],
+    [
+      215,
       76,
       0,
-      102,
+      107,
       1,
       "MASK"
     ],
     [
-      206,
+      216,
       13,
       0,
-      102,
+      107,
       0,
       "IMAGE"
     ],
     [
-      207,
-      102,
+      217,
+      22,
       0,
-      100,
-      0,
-      "IMAGE"
+      105,
+      1,
+      "BBOX"
     ]
   ],
   "groups": [],
@@ -546,8 +546,8 @@
     "ds": {
       "scale": 1.22845973573675,
       "offset": [
-        -51.48501755999546,
-        -141.54638995866998
+        54.4743500324315,
+        -114.57492868636372
       ]
     }
   },

@@ -1,17 +1,17 @@
 {
   "last_node_id": 104,
-  "last_link_id": 210,
+  "last_link_id": 209,
   "nodes": [
     {
       "id": 13,
       "type": "LoadImage",
       "pos": [
-        140,
-        400
+        100,
+        410
       ],
       "size": [
         300,
-        550
+        560
       ],
       "flags": {},
       "order": 0,
@@ -25,7 +25,7 @@
             64,
             181,
             182,
-            209
+            205
           ],
           "slot_index": 0
         },
@@ -48,12 +48,12 @@
       "id": 22,
       "type": "Box",
       "pos": [
-        460,
+        420,
         230
       ],
       "size": [
-        320,
-        78
+        300,
+        80
       ],
       "flags": {},
       "order": 2,
@@ -77,7 +77,7 @@
           "links": [
             61,
             152,
-            203
+            207
           ],
           "slot_index": 0
         }
@@ -90,42 +90,15 @@
       ]
     },
     {
-      "id": 24,
-      "type": "PreviewImage",
-      "pos": [
-        460,
-        490
-      ],
-      "size": [
-        320,
-        510
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 62
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": []
-    },
-    {
       "id": 38,
       "type": "Draw Bounding Box",
       "pos": [
-        460,
-        350
+        420,
+        360
       ],
       "size": [
-        320,
-        102
+        300,
+        110
       ],
       "flags": {},
       "order": 3,
@@ -147,7 +120,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            62
+            199
           ],
           "slot_index": 0
         }
@@ -157,19 +130,19 @@
       },
       "widgets_values": [
         "red",
-        3
+        5
       ]
     },
     {
       "id": 76,
       "type": "Segment",
       "pos": [
-        800,
+        740,
         230
       ],
       "size": [
-        320,
-        98
+        300,
+        100
       ],
       "flags": {},
       "order": 4,
@@ -197,7 +170,7 @@
           "type": "MASK",
           "links": [
             155,
-            208
+            204
           ],
           "slot_index": 0
         }
@@ -213,12 +186,12 @@
       "id": 77,
       "type": "MaskToImage",
       "pos": [
-        800,
-        370
+        740,
+        380
       ],
       "size": [
-        320,
-        26
+        300,
+        30
       ],
       "flags": {},
       "order": 6,
@@ -235,7 +208,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            156
+            200
           ],
           "slot_index": 0
         }
@@ -249,12 +222,12 @@
       "id": 78,
       "type": "PreviewImage",
       "pos": [
-        800,
-        440
+        740,
+        460
       ],
       "size": [
-        320,
-        510
+        300,
+        500
       ],
       "flags": {},
       "order": 8,
@@ -263,7 +236,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 156
+          "link": 200
         }
       ],
       "outputs": [],
@@ -276,7 +249,7 @@
       "id": 88,
       "type": "Finegrain API",
       "pos": [
-        140,
+        100,
         230
       ],
       "size": [
@@ -294,7 +267,7 @@
           "links": [
             180,
             184,
-            205
+            206
           ],
           "slot_index": 0
         }
@@ -305,20 +278,47 @@
       "widgets_values": [
         "",
         "",
-        "low",
+        "standard",
         60
       ]
     },
     {
       "id": 100,
-      "type": "Crop Image to Bounding Box",
+      "type": "PreviewImage",
       "pos": [
-        1140,
-        320
+        420,
+        520
       ],
       "size": [
-        320,
-        46
+        300,
+        500
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 199
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 101,
+      "type": "Crop Image to Bounding Box",
+      "pos": [
+        1060,
+        330
+      ],
+      "size": [
+        300,
+        50
       ],
       "flags": {},
       "order": 9,
@@ -327,12 +327,12 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 210
+          "link": 201
         },
         {
           "name": "bbox",
           "type": "BBOX",
-          "link": 203
+          "link": 207
         }
       ],
       "outputs": [
@@ -340,26 +340,25 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            204
+            209
           ],
           "slot_index": 0
         }
       ],
       "properties": {
         "Node name for S&R": "Crop Image to Bounding Box"
-      },
-      "widgets_values": []
+      }
     },
     {
       "id": 102,
       "type": "Shadow",
       "pos": [
-        1140,
-        410
+        1060,
+        430
       ],
       "size": [
-        320,
-        194
+        300,
+        200
       ],
       "flags": {},
       "order": 10,
@@ -368,12 +367,12 @@
         {
           "name": "api",
           "type": "FG_API",
-          "link": 205
+          "link": 206
         },
         {
           "name": "cutout",
           "type": "IMAGE",
-          "link": 204
+          "link": 209
         },
         {
           "name": "bbox",
@@ -387,7 +386,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            206
+            203
           ],
           "slot_index": 0
         }
@@ -407,12 +406,12 @@
       "id": 103,
       "type": "PreviewImage",
       "pos": [
-        1140,
-        650
+        1060,
+        680
       ],
       "size": [
-        320,
-        360
+        300,
+        350
       ],
       "flags": {},
       "order": 11,
@@ -421,25 +420,24 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 206
+          "link": 203
         }
       ],
       "outputs": [],
       "properties": {
         "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": []
+      }
     },
     {
       "id": 104,
       "type": "Apply Transparency Mask to Image",
       "pos": [
-        1140,
+        1060,
         230
       ],
       "size": [
-        320,
-        46
+        300,
+        50
       ],
       "flags": {},
       "order": 7,
@@ -448,12 +446,12 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 209
+          "link": 205
         },
         {
           "name": "mask",
           "type": "MASK",
-          "link": 208
+          "link": 204
         }
       ],
       "outputs": [
@@ -461,7 +459,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            210
+            201
           ],
           "slot_index": 0
         }
@@ -479,14 +477,6 @@
       38,
       1,
       "BBOX"
-    ],
-    [
-      62,
-      38,
-      0,
-      24,
-      0,
-      "IMAGE"
     ],
     [
       64,
@@ -511,14 +501,6 @@
       77,
       0,
       "MASK"
-    ],
-    [
-      156,
-      77,
-      0,
-      78,
-      0,
-      "IMAGE"
     ],
     [
       180,
@@ -553,31 +535,31 @@
       "FG_API"
     ],
     [
-      203,
-      22,
+      199,
+      38,
       0,
       100,
-      1,
-      "BBOX"
-    ],
-    [
-      204,
-      100,
       0,
-      102,
-      1,
       "IMAGE"
     ],
     [
-      205,
-      88,
+      200,
+      77,
       0,
-      102,
+      78,
       0,
-      "FG_API"
+      "IMAGE"
     ],
     [
-      206,
+      201,
+      104,
+      0,
+      101,
+      0,
+      "IMAGE"
+    ],
+    [
+      203,
       102,
       0,
       103,
@@ -585,7 +567,7 @@
       "IMAGE"
     ],
     [
-      208,
+      204,
       76,
       0,
       104,
@@ -593,7 +575,7 @@
       "MASK"
     ],
     [
-      209,
+      205,
       13,
       0,
       104,
@@ -601,11 +583,27 @@
       "IMAGE"
     ],
     [
-      210,
-      104,
+      206,
+      88,
       0,
-      100,
+      102,
       0,
+      "FG_API"
+    ],
+    [
+      207,
+      22,
+      0,
+      101,
+      1,
+      "BBOX"
+    ],
+    [
+      209,
+      101,
+      0,
+      102,
+      1,
       "IMAGE"
     ]
   ],
@@ -615,8 +613,8 @@
     "ds": {
       "scale": 1.22845973573675,
       "offset": [
-        -51.48501755999546,
-        -141.54638995866998
+        -14.880858276845828,
+        -135.7667183626006
       ]
     }
   },

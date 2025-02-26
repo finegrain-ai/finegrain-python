@@ -1,17 +1,17 @@
 {
-  "last_node_id": 111,
-  "last_link_id": 231,
+  "last_node_id": 100,
+  "last_link_id": 200,
   "nodes": [
     {
       "id": 13,
       "type": "LoadImage",
       "pos": [
-        140,
-        400
+        100,
+        410
       ],
       "size": [
         300,
-        550
+        314
       ],
       "flags": {},
       "order": 0,
@@ -23,7 +23,9 @@
           "type": "IMAGE",
           "links": [
             64,
-            213
+            181,
+            182,
+            196
           ],
           "slot_index": 0
         },
@@ -38,50 +40,67 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "potted_plant.png",
+        "beach (1).jpg",
         "image"
       ]
     },
     {
-      "id": 24,
-      "type": "PreviewImage",
+      "id": 22,
+      "type": "Box",
       "pos": [
-        460,
-        540
+        420,
+        230
       ],
       "size": [
-        320,
-        510
+        300,
+        80
       ],
       "flags": {},
-      "order": 6,
+      "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "name": "images",
+          "name": "api",
+          "type": "FG_API",
+          "link": 180
+        },
+        {
+          "name": "image",
           "type": "IMAGE",
-          "link": 211
+          "link": 181
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "bbox",
+          "type": "BBOX",
+          "links": [
+            61,
+            152
+          ],
+          "slot_index": 0
+        }
+      ],
       "properties": {
-        "Node name for S&R": "PreviewImage"
+        "Node name for S&R": "Box"
       },
-      "widgets_values": []
+      "widgets_values": [
+        "mother and girl"
+      ]
     },
     {
       "id": 38,
       "type": "Draw Bounding Box",
       "pos": [
-        460,
-        400
+        420,
+        360
       ],
       "size": [
-        320,
-        102
+        300,
+        110
       ],
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
@@ -92,7 +111,7 @@
         {
           "name": "bbox",
           "type": "BBOX",
-          "link": 210
+          "link": 61
         }
       ],
       "outputs": [
@@ -100,7 +119,7 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            211
+            199
           ],
           "slot_index": 0
         }
@@ -110,14 +129,126 @@
       },
       "widgets_values": [
         "red",
-        3
+        5
       ]
+    },
+    {
+      "id": 76,
+      "type": "Segment",
+      "pos": [
+        740,
+        230
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "api",
+          "type": "FG_API",
+          "link": 184
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 182
+        },
+        {
+          "name": "bbox",
+          "type": "BBOX",
+          "link": 152
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            155,
+            197
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Segment"
+      },
+      "widgets_values": [
+        false
+      ]
+    },
+    {
+      "id": 77,
+      "type": "MaskToImage",
+      "pos": [
+        740,
+        380
+      ],
+      "size": [
+        300,
+        30
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 155
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            200
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MaskToImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 78,
+      "type": "PreviewImage",
+      "pos": [
+        740,
+        460
+      ],
+      "size": [
+        300,
+        250
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 200
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
     },
     {
       "id": 88,
       "type": "Finegrain API",
       "pos": [
-        140,
+        100,
         230
       ],
       "size": [
@@ -125,7 +256,7 @@
         130
       ],
       "flags": {},
-      "order": 3,
+      "order": 1,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -133,7 +264,9 @@
           "name": "api",
           "type": "FG_API",
           "links": [
-            212
+            180,
+            184,
+            195
           ],
           "slot_index": 0
         }
@@ -144,121 +277,39 @@
       "widgets_values": [
         "",
         "",
-        "low",
-        60
+        "standard",
+        120
       ]
     },
     {
-      "id": 104,
-      "type": "Bounding Box",
+      "id": 97,
+      "type": "Eraser",
       "pos": [
-        460,
+        1060,
         230
       ],
       "size": [
-        320,
-        130
+        300,
+        150
       ],
       "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "bbox",
-          "type": "BBOX",
-          "links": [
-            210,
-            215
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Bounding Box"
-      },
-      "widgets_values": [
-        580,
-        1195,
-        805,
-        1420
-      ]
-    },
-    {
-      "id": 106,
-      "type": "LoadImage",
-      "pos": [
-        800,
-        230
-      ],
-      "size": [
-        320,
-        340
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            230
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": [
-            228
-          ],
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "cutout.png",
-        "image"
-      ]
-    },
-    {
-      "id": 107,
-      "type": "Blender",
-      "pos": [
-        800,
-        770
-      ],
-      "size": [
-        320,
-        214
-      ],
-      "flags": {},
-      "order": 8,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
           "name": "api",
           "type": "FG_API",
-          "link": 212
+          "link": 195
         },
         {
-          "name": "scene",
+          "name": "image",
           "type": "IMAGE",
-          "link": 213
+          "link": 196
         },
         {
-          "name": "cutout",
-          "type": "IMAGE",
-          "link": 231
-        },
-        {
-          "name": "bbox",
-          "type": "BBOX",
-          "link": 215
+          "name": "mask",
+          "type": "MASK",
+          "link": 197
         }
       ],
       "outputs": [
@@ -266,32 +317,30 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            225
+            198
           ],
           "slot_index": 0
         }
       ],
       "properties": {
-        "Node name for S&R": "Blender"
+        "Node name for S&R": "Eraser"
       },
       "widgets_values": [
-        "express",
-        false,
-        0,
+        "premium",
         1,
         "fixed"
       ]
     },
     {
-      "id": 108,
+      "id": 98,
       "type": "PreviewImage",
       "pos": [
-        1140,
+        1060,
         430
       ],
       "size": [
-        320,
-        520
+        300,
+        250
       ],
       "flags": {},
       "order": 9,
@@ -300,7 +349,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 225
+          "link": 198
         }
       ],
       "outputs": [],
@@ -310,84 +359,42 @@
       "widgets_values": []
     },
     {
-      "id": 110,
-      "type": "InvertMask",
+      "id": 100,
+      "type": "PreviewImage",
       "pos": [
-        800,
-        610
+        420,
+        520
       ],
       "size": [
-        320,
-        26
+        300,
+        246
       ],
       "flags": {},
       "order": 5,
       "mode": 0,
       "inputs": [
         {
-          "name": "mask",
-          "type": "MASK",
-          "link": 228
-        }
-      ],
-      "outputs": [
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": [
-            229
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "InvertMask"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 111,
-      "type": "Apply Transparency Mask to Image",
-      "pos": [
-        800,
-        680
-      ],
-      "size": [
-        320,
-        46
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
+          "name": "images",
           "type": "IMAGE",
-          "link": 230
-        },
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 229
+          "link": 199
         }
       ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            231
-          ],
-          "slot_index": 0
-        }
-      ],
+      "outputs": [],
       "properties": {
-        "Node name for S&R": "Apply Transparency Mask to Image"
+        "Node name for S&R": "PreviewImage"
       },
       "widgets_values": []
     }
   ],
   "links": [
+    [
+      61,
+      22,
+      0,
+      38,
+      1,
+      "BBOX"
+    ],
     [
       64,
       13,
@@ -397,83 +404,99 @@
       "IMAGE"
     ],
     [
-      210,
-      104,
+      152,
+      22,
       0,
-      38,
-      1,
+      76,
+      2,
       "BBOX"
     ],
     [
-      211,
-      38,
+      155,
+      76,
       0,
-      24,
+      77,
       0,
-      "IMAGE"
+      "MASK"
     ],
     [
-      212,
+      180,
       88,
       0,
-      107,
+      22,
       0,
       "FG_API"
     ],
     [
-      213,
+      181,
       13,
       0,
-      107,
+      22,
       1,
       "IMAGE"
     ],
     [
-      215,
-      104,
+      182,
+      13,
       0,
-      107,
-      3,
-      "BBOX"
-    ],
-    [
-      225,
-      107,
-      0,
-      108,
-      0,
+      76,
+      1,
       "IMAGE"
     ],
     [
-      228,
-      106,
-      1,
-      110,
+      184,
+      88,
       0,
-      "MASK"
+      76,
+      0,
+      "FG_API"
     ],
     [
-      229,
-      110,
+      195,
+      88,
       0,
-      111,
-      1,
-      "MASK"
+      97,
+      0,
+      "FG_API"
     ],
     [
-      230,
-      106,
+      196,
+      13,
       0,
-      111,
-      0,
+      97,
+      1,
       "IMAGE"
     ],
     [
-      231,
-      111,
+      197,
+      76,
       0,
-      107,
+      97,
       2,
+      "MASK"
+    ],
+    [
+      198,
+      97,
+      0,
+      98,
+      0,
+      "IMAGE"
+    ],
+    [
+      199,
+      38,
+      0,
+      100,
+      0,
+      "IMAGE"
+    ],
+    [
+      200,
+      77,
+      0,
+      78,
+      0,
       "IMAGE"
     ]
   ],
@@ -481,10 +504,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 1.22845973573675,
+      "scale": 1.351305709310425,
       "offset": [
-        -51.48501755999546,
-        -141.54638995866998
+        -48.06891060345773,
+        -66.0978357744418
       ]
     }
   },

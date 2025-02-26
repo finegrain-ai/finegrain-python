@@ -66,24 +66,61 @@ Alternatively if you installed ComfyUI via the "Windows Standalone archive", you
 
 ## Workflow examples
 
-All the below examples were made using v0.1.0 of the nodes.
+> [!Note]
+> All the below workflow examples were made using comfyui-finegrain v0.2.0.
 
-### Object Cutout
+### Prompt to erase
 
-[![Object Cutout example workflow](assets/cutout.webp)](assets/cutout.json)
+Instantly remove any object, along with its shadows and reflections, just by naming it.
 
-### Object Recolor
+![Prompt to erase workflow](assets/erase.webp?raw=true)
 
-[![Object Recolor example workflow](assets/recolor.webp)](assets/recolor.json)
+[Download the Prompt to erase workflow](assets/erase.json)
 
-### Shadow Creator
+### Prompt to cutout
 
-[![Shadow Creator example workflow](assets/shadow.webp)](assets/shadow.json)
+Instantly isolate any object in a photo into a perfect cutout, just by naming it.
 
-### Object Eraser
+![Prompt to cutout workflow](assets/cutout.webp?raw=true)
 
-[![Object Eraser example workflow](assets/eraser.webp)](assets/eraser.json)
+[Download the Prompt to cutout workflow](assets/cutout.json)
 
-### Object Blender
+### Prompt to recolor
 
-[![Object Blender example workflow](assets/blender.webp)](assets/blender.json)
+Instantly change the color of any object in a photo, even through occlusions, just by naming it.
+
+![Prompt to recolor workflow](assets/recolor.webp?raw=true)
+
+[Download the Prompt to recolor workflow](assets/recolor.json)
+
+### Swap
+
+Replace any object in a photo with another, recreating shadows and reflections so naturally it looks like the new object was always there — perfectly preserved in every detail.
+
+![Swap workflow](assets/swap.webp?raw=true)
+
+[Download the Swap workflow](assets/swap.json)
+
+### Blend
+
+Seamlessly integrate any object into a scene, recreating shadows and reflections for a result so natural it looks like it was always there — perfectly preserved in every detail.
+
+![Blend workflow](assets/blend.webp?raw=true)
+
+[Download the Blend workflow](assets/blend.json)
+
+### Generate packshot
+
+Generate Packshot – Transform any mundane photo into a stunning white-background image with a perfectly natural shadow.
+
+![Generate packshot workflow](assets/packshot.webp?raw=true)
+
+[Download the Generate packshot workflow](assets/packshot.json)
+
+### Remove background
+
+Remove Background – Our pixel-perfect, high-resolution take on a classic, effortlessly extracting the main object from its background.
+
+![Remove background workflow](assets/removebg.webp?raw=true)
+
+[Download the Remove background workflow](assets/removebg.json)
