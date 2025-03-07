@@ -43,6 +43,20 @@ class ObjectNotFoundError(app_commands.AppCommandError):
         self.prompt = prompt
 
 
+class TooLargeOutputError(app_commands.AppCommandError):
+    def __init__(self, actual_size: int, max_size: int) -> None:
+        self.actual_size = actual_size
+        self.max_size = max_size
+
+    @property
+    def actual_size_mb(self) -> str:
+        return f"{self.actual_size / (1024 * 1024):.2f} MB"
+
+    @property
+    def max_size_mb(self) -> str:
+        return f"{self.max_size / (1024 * 1024):.2f} MB"
+
+
 class FinegrainBot(discord.Client):
     def __init__(self, api_ctx: EditorAPIContext, *, intents: discord.Intents):
         super().__init__(intents=intents)
@@ -100,6 +114,21 @@ class BotImage:
             height=attachment.height,
         )
 
+    def compress(self) -> "BotImage":
+        with BytesIO(self.data) as f:
+            img = Image.open(f)
+            with BytesIO() as of:
+                img.save(of, format="WEBP", quality=80)
+                return BotImage(
+                    uid=self.uid,
+                    content_type="image/webp",
+                    data=of.getvalue(),
+                )
+
+    def to_discord_file(self) -> discord.File:
+        filename = f"{self.uid}.{self.content_type.split('/')[1]}"
+        return discord.File(BytesIO(self.data), filename=filename)
+
 
 @dataclass
 class DetectResult:
@@ -126,6 +155,12 @@ class DetectResult:
         return ", ".join(
             f"{len([r for r in results if r.label == label])} x '{label}'" for label in set(r.label for r in results)
         )
+
+
+def _get_max_upload_size(interaction: discord.Interaction) -> int | None:
+    """Should be 10MB. Except for boosted servers, e.g. 50MB with Level 2 (7 Boosts)."""
+    guild = interaction.channel.guild if interaction.channel is not None else None
+    return guild.filesize_limit if guild is not None else None
 
 
 async def _call_multi_segment(
@@ -221,6 +256,22 @@ async def _load_attached_image(attachment: discord.Attachment) -> BotImage:
     return await BotImage.from_attachment(attachment)
 
 
+def _safe_before_after(
+    input_image: BotImage, output_image: BotImage, max_upload_size: int | None = None
+) -> tuple[discord.File, discord.File]:
+    if max_upload_size is None:
+        return input_image.to_discord_file(), output_image.to_discord_file()
+
+    total_size = len(input_image.data) + len(output_image.data)
+    if total_size > max_upload_size:
+        _log.warning(f"compressing before/after images for output={output_image.uid}")
+        input_image, output_image = input_image.compress(), output_image.compress()
+        if (final_total_size := len(input_image.data) + len(output_image.data)) > max_upload_size:
+            raise TooLargeOutputError(final_total_size, max_upload_size)
+
+    return input_image.to_discord_file(), output_image.to_discord_file()
+
+
 @bot.event
 async def on_ready() -> None:
     _log.info(f"logged in as {bot.user}")
@@ -265,13 +316,8 @@ async def erase(
     output_image, found_objects = await _call_object_eraser(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
     reply = f"\N{SPONGE} Before/After for prompt '{prompt}'. I erased {DetectResult.info(found_objects)}:"
-    await interaction.followup.send(
-        reply,
-        files=(
-            interaction.extras["input_file"],
-            discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.jpg"),
-        ),
-    )
+    before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
+    await interaction.followup.send(reply, files=before_after)
 
 
 @bot.tree.command()
@@ -292,13 +338,8 @@ async def extract(
     output_image, found_objects = await _call_object_cutter(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
     reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}'. I extracted {DetectResult.info(found_objects)}:"
-    await interaction.followup.send(
-        reply,
-        files=(
-            interaction.extras["input_file"],
-            discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.png"),
-        ),
-    )
+    before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
+    await interaction.followup.send(reply, files=before_after)
 
 
 # NOTE: as per discord.py `ErrorFunc`, the coroutine is annotated with `discord.Interaction` and
@@ -320,6 +361,11 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
         input_file = interaction.extras.get("input_file")
         assert isinstance(input_file, discord.File)
         files.append(input_file)
+    elif isinstance(error, TooLargeOutputError):
+        reply = (
+            f"Oops! Cannot send the output images because they are too large \N{NO ENTRY SIGN}. "
+            f"Maximum allowed size is {error.max_size_mb}, but the output size is {error.actual_size_mb}."
+        )
     else:
         reply = "Oops! Something went wrong \N{CONFUSED FACE}. Give it another try in a bit!"
 
