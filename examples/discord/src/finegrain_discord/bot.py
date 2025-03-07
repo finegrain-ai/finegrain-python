@@ -3,7 +3,7 @@ import logging
 from dataclasses import dataclass
 from io import BytesIO
 from textwrap import dedent
-from typing import Literal
+from typing import Any, Literal
 
 import discord
 from discord import Intents, app_commands
@@ -101,7 +101,36 @@ class BotImage:
         )
 
 
-async def _call_multi_segment(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> tuple[str, str]:
+@dataclass
+class DetectResult:
+    bbox: tuple[int, int, int, int]
+    label: str
+
+    @classmethod
+    def parse_meta(cls, meta: dict[str, Any]) -> list["DetectResult"]:
+        assert "results" in meta
+        results: list[DetectResult] = []
+        for r in meta["results"]:
+            assert "bbox" in r
+            assert isinstance(r["bbox"], list)
+            assert len(r["bbox"]) == 4
+            assert all(isinstance(i, int) for i in r["bbox"])
+            assert "label" in r
+            assert isinstance(r["label"], str)
+            results.append(cls(bbox=tuple(r["bbox"]), label=r["label"]))
+        return results
+
+    @classmethod
+    def info(cls, results: list["DetectResult"]) -> str:
+        # e.g; 1 x 'book', 2 x 'vase'
+        return ", ".join(
+            f"{len([r for r in results if r.label == label])} x '{label}'" for label in set(r.label for r in results)
+        )
+
+
+async def _call_multi_segment(
+    api_ctx: EditorAPIContext, image: BotImage, prompt: str
+) -> tuple[str, str, list[DetectResult]]:
     with BytesIO() as f:
         f.write(image.data)
         response = await api_ctx.request("POST", "state/upload", files={"file": f})
@@ -109,15 +138,14 @@ async def _call_multi_segment(api_ctx: EditorAPIContext, image: BotImage, prompt
 
     st_detect = await api_ctx.ensure_skill(f"detect/{st_input}", {"prompt": prompt})
     meta_detect = await api_ctx.get_meta(st_detect)
-    assert "results" in meta_detect
 
-    target_objects = meta_detect["results"]
+    target_objects = DetectResult.parse_meta(meta_detect)
     if not target_objects:
         raise ObjectNotFoundError(prompt=prompt)
 
     async with asyncio.TaskGroup() as tg:
         segmentations = [
-            tg.create_task(api_ctx.ensure_skill(f"segment/{st_input}", {"bbox": target["bbox"]}))
+            tg.create_task(api_ctx.ensure_skill(f"segment/{st_input}", {"bbox": target.bbox}))
             for target in target_objects
         ]
 
@@ -127,13 +155,13 @@ async def _call_multi_segment(api_ctx: EditorAPIContext, image: BotImage, prompt
     else:
         st_mask = await api_ctx.ensure_skill("merge-masks", {"operation": "union", "states": st_masks})
 
-    return st_input, st_mask
+    return st_input, st_mask, target_objects
 
 
 async def _call_object_eraser(
     api_ctx: EditorAPIContext, image: BotImage, prompt: str, mode: Literal["express", "standard", "premium"] = "premium"
-) -> BotImage:
-    st_input, st_mask = await _call_multi_segment(api_ctx, image, prompt)
+) -> tuple[BotImage, list[DetectResult]]:
+    st_input, st_mask, found_objects = await _call_multi_segment(api_ctx, image, prompt)
 
     st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": mode})
 
@@ -147,11 +175,13 @@ async def _call_object_eraser(
         uid=st_erased,
         content_type="image/jpeg",
         data=response.content,
-    )
+    ), found_objects
 
 
-async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> BotImage:
-    st_input, st_mask = await _call_multi_segment(api_ctx, image, prompt)
+async def _call_object_cutter(
+    api_ctx: EditorAPIContext, image: BotImage, prompt: str
+) -> tuple[BotImage, list[DetectResult]]:
+    st_input, st_mask, found_objects = await _call_multi_segment(api_ctx, image, prompt)
 
     st_cutout = await api_ctx.ensure_skill(f"cutout/{st_input}/{st_mask}")
 
@@ -182,7 +212,7 @@ async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt
             uid=st_cutout,
             content_type="image/png",
             data=f.getvalue(),
-        )
+        ), found_objects
 
 
 async def _load_attached_image(attachment: discord.Attachment) -> BotImage:
@@ -232,10 +262,11 @@ async def erase(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image = await _call_object_eraser(bot.api_ctx, input_image, prompt)
+    output_image, found_objects = await _call_object_eraser(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
+    reply = f"\N{SPONGE} Before/After for prompt '{prompt}'. I erased {DetectResult.info(found_objects)}:"
     await interaction.followup.send(
-        f"\N{SPONGE} Before/After for prompt '{prompt}':",
+        reply,
         files=(
             interaction.extras["input_file"],
             discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.jpg"),
@@ -258,10 +289,11 @@ async def extract(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image = await _call_object_cutter(bot.api_ctx, input_image, prompt)
+    output_image, found_objects = await _call_object_cutter(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
+    reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}'. I extracted {DetectResult.info(found_objects)}:"
     await interaction.followup.send(
-        f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}':",
+        reply,
         files=(
             interaction.extras["input_file"],
             discord.File(BytesIO(output_image.data), filename=f"{output_image.uid}.png"),
