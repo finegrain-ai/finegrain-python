@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 Priority = Literal["low", "standard", "high"]
 
+VERSION = "0.1"
+
 
 class SSELoopStopped(RuntimeError):
     first_error: Exception | None
@@ -245,6 +247,7 @@ class EditorAPIContext:
     priority: Priority
     verify: bool | str
     default_timeout: float
+    user_agent: str
 
     token: str | None
     logger: logging.Logger
@@ -264,6 +267,7 @@ class EditorAPIContext:
         priority: Priority = "standard",
         verify: bool | str = True,
         default_timeout: float = 60.0,
+        user_agent: str | None = None,
     ) -> None:
         self.user = user
         self.password = password
@@ -271,6 +275,12 @@ class EditorAPIContext:
         self.priority = priority
         self.verify = verify
         self.default_timeout = default_timeout
+
+        client_ua = f"finegrain-python/{VERSION}"
+        if user_agent is None:
+            self.user_agent = client_ua
+        else:
+            self.user_agent = f"{user_agent} ({client_ua})"
 
         self.logger = logger
         self._sse_source = ResilientEventSource(
@@ -298,7 +308,7 @@ class EditorAPIContext:
             self._client_ctx_depth += 1
             return self._client
         assert self._client_ctx_depth == 0
-        self._client = httpx.AsyncClient(verify=self.verify)
+        self._client = httpx.AsyncClient(verify=self.verify, headers={"User-Agent": self.user_agent})
         self._client_ctx_depth = 1
         return self._client
 
