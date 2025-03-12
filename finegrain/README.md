@@ -49,3 +49,26 @@ if __name__ == "__main__":
     ctx = EditorAPIContext(user=args.user, password=args.password)
     asyncio.run(co(ctx, args.prompt, args.input_file, args.output_file))
 ```
+
+## Running tests
+
+You need an API key to run tests. Be careful: doing so will use credits!
+
+The most basic way to run tests is:
+
+```bash
+FG_API_KEY=FGAPI-ABCDEF-123456-7890AB-CDEF12 rye test
+```
+
+If you run tests to debug something you can use for instance:
+
+```bash
+odir="/tmp/api-tests-$(date '+%Y-%m-%d-%H-%M-%S')"
+mkdir -p "$odir"
+
+FG_API_KEY=FGAPI-ABCDEF-123456-7890AB-CDEF12 \
+FG_API_URL="https://.../editor" \
+FG_TESTS_OUTPUT_DIR="$odir" \
+    rye run pytest -v \
+    -s -o log_cli=true -o log_level=INFO
+```
