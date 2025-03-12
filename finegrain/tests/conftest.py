@@ -26,10 +26,14 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def fgctx() -> AsyncGenerator[EditorAPIContext, None]:
     with env.prefixed("FG_API_"):
-        api_key = env.str("KEY", None)
+        credentials = env.str("CREDENTIALS", None)
         url = env.str("URL", "https://api.finegrain.ai/editor")
-    assert api_key and url, "set FG_API_KEY"
-    ctx = EditorAPIContext(api_key=api_key, base_url=url)
+    assert credentials and url, "set FG_API_CREDENTIALS"
+    ctx = EditorAPIContext(
+        credentials=credentials,
+        base_url=url,
+        user_agent="finegrain-python-tests",
+    )
 
     await ctx.login()
     await ctx.sse_start()

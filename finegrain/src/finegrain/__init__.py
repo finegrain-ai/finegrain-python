@@ -3,6 +3,7 @@ import dataclasses as dc
 import json
 import logging
 import random
+import re
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from typing import Any, BinaryIO, Literal, NewType, cast, get_args
@@ -17,6 +18,9 @@ Priority = Literal["low", "standard", "high"]
 StateID = NewType("StateID", str)
 
 VERSION = "0.1"
+
+API_KEY_PATTERN = re.compile(r"^FGAPI(\-[A-Z0-9]{6}){4}$")
+EMAIL_PWD_PATTERN = re.compile(r"^\s(?P<email>[\S]+@[\S]+):(?P<pwd>\S+)\s$")
 
 
 def check_status(response: httpx.Response) -> None:
@@ -313,21 +317,29 @@ class EditorAPIContext:
 
     def __init__(
         self,
+        credentials: str | None = None,
         api_key: str | None = None,
         user: str | None = None,
         password: str | None = None,
-        base_url: str = "https://api.finegrain.ai/editor",
+        base_url: str | None = None,
         priority: Priority = "standard",
         verify: bool | str = True,
         default_timeout: float = 60.0,
         user_agent: str | None = None,
     ) -> None:
-        self.base_url = base_url
+        self.base_url = base_url or "https://api.finegrain.ai/editor"
         self.priority = priority
         self.verify = verify
         self.default_timeout = default_timeout
 
-        if api_key is not None:
+        if credentials is not None:
+            if (m := API_KEY_PATTERN.match(credentials)) is not None:
+                self.credentials = ApiKeyCredentials(api_key=m[0])
+            elif (m := EMAIL_PWD_PATTERN.match(credentials)) is not None:
+                self.credentials = LoginCredentials(user=m["email"], password=m["pwd"])
+            else:
+                raise ValueError("invalid credentials")
+        elif api_key is not None:
             self.credentials = ApiKeyCredentials(api_key=api_key)
         elif user is not None and password is not None:
             self.credentials = LoginCredentials(user=user, password=password)

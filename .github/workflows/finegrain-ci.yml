@@ -32,7 +32,7 @@ jobs:
         run: rye tools install pyright --force
 
       - name: rye sync
-        run: rye sync --no-dev --no-lock
+        run: rye sync
 
       - name: format
         run: rye fmt --check
