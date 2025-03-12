@@ -19,6 +19,15 @@ StateID = NewType("StateID", str)
 VERSION = "0.1"
 
 
+def check_status(response: httpx.Response) -> None:
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        msg = f"{str(e)}\nBody: {response.text}"
+        exc = httpx.HTTPStatusError(message=msg, request=e.request, response=e.response)
+        raise exc from e
+
+
 class SSELoopStopped(RuntimeError):
     first_error: Exception | None
     last_error: Exception | None
@@ -226,7 +235,7 @@ class ResilientEventSource:
                     httpx.AsyncClient(timeout=None, verify=self.verify) as c,
                     httpx_sse.aconnect_sse(c, "GET", url, headers=self.headers) as es,
                 ):
-                    es.response.raise_for_status()
+                    check_status(es.response)
                     self.success()
                     if ping_interval > 0:
                         timeout = ping_interval + self.server_ping_grace_period
@@ -345,7 +354,7 @@ class EditorAPIContext:
                 f"{self.base_url}/auth/login",
                 json={"username": self.user, "password": self.password},
             )
-        response.raise_for_status()
+        check_status(response)
         self.logger.debug(f"logged in as {self.user}")
         r = response.json()
         self.credits = r["user"]["credits"]
@@ -381,7 +390,7 @@ class EditorAPIContext:
                 r = await _q()
 
         if raise_for_status:
-            r.raise_for_status()
+            check_status(r)
         return r
 
     async def get_sub_url(self) -> str:
