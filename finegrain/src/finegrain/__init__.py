@@ -262,9 +262,38 @@ class ResilientEventSource:
                 self.failure(exc)
 
 
-class EditorAPIContext:
+@dc.dataclass(kw_only=True)
+class LoginCredentials:
     user: str
     password: str
+
+    @property
+    def as_login_params(self) -> dict[str, str]:
+        return {"username": self.user, "password": self.password}
+
+    @property
+    def description(self) -> str:
+        return f"user {self.user}"
+
+
+@dc.dataclass(kw_only=True)
+class ApiKeyCredentials:
+    api_key: str
+
+    @property
+    def as_login_params(self) -> dict[str, str]:
+        return {"api_key": self.api_key}
+
+    @property
+    def description(self) -> str:
+        return f"API key {self.api_key[:13]}..."
+
+
+type Credentials = LoginCredentials | ApiKeyCredentials
+
+
+class EditorAPIContext:
+    credentials: Credentials
     base_url: str
     priority: Priority
     verify: bool | str
@@ -284,20 +313,26 @@ class EditorAPIContext:
 
     def __init__(
         self,
-        user: str,
-        password: str,
+        api_key: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
         base_url: str = "https://api.finegrain.ai/editor",
         priority: Priority = "standard",
         verify: bool | str = True,
         default_timeout: float = 60.0,
         user_agent: str | None = None,
     ) -> None:
-        self.user = user
-        self.password = password
         self.base_url = base_url
         self.priority = priority
         self.verify = verify
         self.default_timeout = default_timeout
+
+        if api_key is not None:
+            self.credentials = ApiKeyCredentials(api_key=api_key)
+        elif user is not None and password is not None:
+            self.credentials = LoginCredentials(user=user, password=password)
+        else:
+            raise ValueError("either `api_key` or `user` and `password` must be provided")
 
         client_ua = f"finegrain-python/{VERSION}"
         if user_agent is None:
@@ -352,10 +387,10 @@ class EditorAPIContext:
         async with self as client:
             response = await client.post(
                 f"{self.base_url}/auth/login",
-                json={"username": self.user, "password": self.password},
+                json=self.credentials.as_login_params,
             )
         check_status(response)
-        self.logger.debug(f"logged in as {self.user}")
+        self.logger.debug(f"logged in as {self.credentials.description}")
         r = response.json()
         self.credits = r["user"]["credits"]
         self.token = r["token"]
