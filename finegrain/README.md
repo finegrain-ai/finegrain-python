@@ -6,6 +6,8 @@ This is a client for the [Finegrain](https://finegrain.ai) API. It requires Pyth
 
 See [this example script](examples/erase.py) to erase an object from an image by prompt.
 
+If you run in a synchronous context and do not want to manage asyncio, see [this example](examples/erase_sync.py) instead.
+
 ## Running tests
 
 You need API credentials (an API key or an email and a password) to run tests. Be careful: doing so will use credits!
