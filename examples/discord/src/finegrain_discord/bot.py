@@ -139,7 +139,6 @@ class DetectResult:
 @dataclass
 class DetectOutput:
     results: list[DetectResult]
-    missing_results: list[str]
 
     @classmethod
     def parse_meta(cls, meta: dict[str, Any]) -> "DetectOutput":
@@ -153,10 +152,7 @@ class DetectOutput:
             assert "label" in r
             assert isinstance(r["label"], str)
             results.append(DetectResult(bbox=tuple(r["bbox"]), label=r["label"]))
-        missing_results: list[str] = meta.get("missing_results", [])
-        assert isinstance(missing_results, list)
-        assert all(isinstance(r, str) for r in missing_results)
-        return cls(results=results, missing_results=missing_results)
+        return cls(results=results)
 
     @property
     def found(self) -> str:
@@ -165,10 +161,6 @@ class DetectOutput:
             f"{len([r for r in self.results if r.label == label])} x '{label}'"
             for label in set(r.label for r in self.results)
         )
-
-    @property
-    def not_found(self) -> str:
-        return ", ".join(f"'{label}'" for label in self.missing_results)
 
 
 def _get_max_upload_size(interaction: discord.Interaction) -> int | None:
@@ -325,9 +317,7 @@ async def erase(
     await interaction.response.defer(thinking=True)
     output_image, detect_output = await _call_object_eraser(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
-    reply = f"\N{SPONGE} Before/After for prompt '{prompt}'. I erased {detect_output.found}."
-    if detect_output.not_found:
-        reply += f" Couldn't find {detect_output.not_found}."
+    reply = f"\N{SPONGE} Before/After for prompt '{prompt}'. I erased {detect_output.found}:"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
     await interaction.followup.send(reply, files=before_after)
 
@@ -349,9 +339,7 @@ async def extract(
     await interaction.response.defer(thinking=True)
     output_image, detect_output = await _call_object_cutter(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
-    reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}'. I extracted {detect_output.found}."
-    if detect_output.not_found:
-        reply += f" Couldn't find {detect_output.not_found}."
+    reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}'. I extracted {detect_output.found}:"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
     await interaction.followup.send(reply, files=before_after)
 
