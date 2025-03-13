@@ -20,7 +20,7 @@ StateID = NewType("StateID", str)
 VERSION = "0.1"
 
 API_KEY_PATTERN = re.compile(r"^FGAPI(\-[A-Z0-9]{6}){4}$")
-EMAIL_PWD_PATTERN = re.compile(r"^\s(?P<email>[\S]+@[\S]+):(?P<pwd>\S+)\s$")
+EMAIL_PWD_PATTERN = re.compile(r"^\s*(?P<email>[\S]+?@[\S]+?):(?P<pwd>\S+)\s*$")
 
 
 def check_status(response: httpx.Response) -> None:
