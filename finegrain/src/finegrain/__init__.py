@@ -1,10 +1,12 @@
 import asyncio
+import dataclasses as dc
 import json
 import logging
 import random
+import re
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
-from typing import Any, Literal, cast
+from typing import Any, BinaryIO, Literal, NewType, cast, get_args
 
 import httpx
 import httpx_sse
@@ -13,8 +15,21 @@ from httpx._types import QueryParamTypes, RequestData, RequestFiles
 logger = logging.getLogger(__name__)
 
 Priority = Literal["low", "standard", "high"]
+StateID = NewType("StateID", str)
 
 VERSION = "0.1"
+
+API_KEY_PATTERN = re.compile(r"^FGAPI(\-[A-Z0-9]{6}){4}$")
+EMAIL_PWD_PATTERN = re.compile(r"^\s*(?P<email>[\S]+?@[\S]+?):(?P<pwd>\S+)\s*$")
+
+
+def check_status(response: httpx.Response) -> None:
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        msg = f"{str(e)}\nBody: {response.text}"
+        exc = httpx.HTTPStatusError(message=msg, request=e.request, response=e.response)
+        raise exc from e
 
 
 class SSELoopStopped(RuntimeError):
@@ -36,24 +51,35 @@ class SSELoopStopped(RuntimeError):
         return f"SSE loop stopped (first error: {self.first_error}, last error: {self.last_error})"
 
 
-class Futures[T]:
-    @classmethod
-    def create_future(cls) -> asyncio.Future[T]:
-        return asyncio.get_running_loop().create_future()
+class Futures[Tk, Tv]:
+    _event_loop: asyncio.AbstractEventLoop | None
+
+    @property
+    def event_loop(self) -> asyncio.AbstractEventLoop:
+        if self._event_loop is None:
+            self._event_loop = asyncio.get_running_loop()
+        else:
+            assert self._event_loop == asyncio.get_running_loop(), "event loop changed"
+        return self._event_loop
+
+    def create_future(self) -> asyncio.Future[Tv]:
+        return self.event_loop.create_future()
 
     def __init__(self, capacity: int = 256) -> None:
-        self.futures = defaultdict[str, asyncio.Future[T]](self.create_future)
+        self.futures = defaultdict[Tk, asyncio.Future[Tv]](self.create_future)
         self.capacity = capacity
+        self._event_loop = None
 
     def cull(self) -> None:
         while len(self.futures) >= self.capacity:
             del self.futures[next(iter(self.futures))]
 
-    def __getitem__(self, key: str) -> asyncio.Future[T]:
+    def __getitem__(self, key: Tk) -> asyncio.Future[Tv]:
+        assert self.event_loop
         self.cull()
         return self.futures[key]
 
-    def __delitem__(self, key: str) -> None:
+    def __delitem__(self, key: Tk) -> None:
         try:
             del self.futures[key]
         except KeyError:
@@ -213,7 +239,7 @@ class ResilientEventSource:
                     httpx.AsyncClient(timeout=None, verify=self.verify) as c,
                     httpx_sse.aconnect_sse(c, "GET", url, headers=self.headers) as es,
                 ):
-                    es.response.raise_for_status()
+                    check_status(es.response)
                     self.success()
                     if ping_interval > 0:
                         timeout = ping_interval + self.server_ping_grace_period
@@ -240,9 +266,38 @@ class ResilientEventSource:
                 self.failure(exc)
 
 
-class EditorAPIContext:
+@dc.dataclass(kw_only=True)
+class LoginCredentials:
     user: str
     password: str
+
+    @property
+    def as_login_params(self) -> dict[str, str]:
+        return {"username": self.user, "password": self.password}
+
+    @property
+    def description(self) -> str:
+        return f"user {self.user}"
+
+
+@dc.dataclass(kw_only=True)
+class ApiKeyCredentials:
+    api_key: str
+
+    @property
+    def as_login_params(self) -> dict[str, str]:
+        return {"api_key": self.api_key}
+
+    @property
+    def description(self) -> str:
+        return f"API key {self.api_key[:13]}..."
+
+
+type Credentials = LoginCredentials | ApiKeyCredentials
+
+
+class EditorAPIContext:
+    credentials: Credentials
     base_url: str
     priority: Priority
     verify: bool | str
@@ -251,30 +306,45 @@ class EditorAPIContext:
 
     token: str | None
     logger: logging.Logger
+    credits: int | None = None
 
     _client: httpx.AsyncClient | None
     _client_ctx_depth: int
-    _sse_futures: Futures[dict[str, Any]]
+    _sse_futures: Futures[StateID, dict[str, Any]]
     _sse_source: ResilientEventSource
     _sse_task: asyncio.Task[None] | None
     _ping_interval: float
 
     def __init__(
         self,
-        user: str,
-        password: str,
-        base_url: str = "https://api.finegrain.ai/editor",
+        credentials: str | None = None,
+        api_key: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        base_url: str | None = None,
         priority: Priority = "standard",
         verify: bool | str = True,
         default_timeout: float = 60.0,
         user_agent: str | None = None,
     ) -> None:
-        self.user = user
-        self.password = password
-        self.base_url = base_url
+        self.base_url = base_url or "https://api.finegrain.ai/editor"
         self.priority = priority
         self.verify = verify
         self.default_timeout = default_timeout
+
+        if credentials is not None:
+            if (m := API_KEY_PATTERN.match(credentials)) is not None:
+                self.credentials = ApiKeyCredentials(api_key=m[0])
+            elif (m := EMAIL_PWD_PATTERN.match(credentials)) is not None:
+                self.credentials = LoginCredentials(user=m["email"], password=m["pwd"])
+            else:
+                raise ValueError("invalid credentials")
+        elif api_key is not None:
+            self.credentials = ApiKeyCredentials(api_key=api_key)
+        elif user is not None and password is not None:
+            self.credentials = LoginCredentials(user=user, password=password)
+        else:
+            raise ValueError("either `api_key` or `user` and `password` must be provided")
 
         client_ua = f"finegrain-python/{VERSION}"
         if user_agent is None:
@@ -329,11 +399,13 @@ class EditorAPIContext:
         async with self as client:
             response = await client.post(
                 f"{self.base_url}/auth/login",
-                json={"username": self.user, "password": self.password},
+                json=self.credentials.as_login_params,
             )
-        response.raise_for_status()
-        self.logger.debug(f"logged in as {self.user}")
-        self.token = response.json()["token"]
+        check_status(response)
+        self.logger.debug(f"logged in as {self.credentials.description}")
+        r = response.json()
+        self.credits = r["user"]["credits"]
+        self.token = r["token"]
 
     async def request(
         self,
@@ -365,7 +437,7 @@ class EditorAPIContext:
                 r = await _q()
 
         if raise_for_status:
-            r.raise_for_status()
+            check_status(r)
         return r
 
     async def get_sub_url(self) -> str:
@@ -385,6 +457,8 @@ class EditorAPIContext:
                 continue
             self.logger.debug(f"got message: {event}")
             self._sse_futures[event["state"]].set_result(event)
+            if "credits_left" in event:
+                self.credits = event["credits_left"]
 
     async def sse_start(self) -> None:
         assert self._sse_task is None
@@ -399,7 +473,7 @@ class EditorAPIContext:
         assert len(exc) == 1 and isinstance(exc[0], asyncio.CancelledError)
         self._sse_task = None
 
-    async def sse_await(self, state_id: str, timeout: float | None = None) -> bool:
+    async def sse_await(self, state_id: StateID, timeout: float | None = None) -> bool:
         assert self._sse_task
         future = self._sse_futures[state_id]
         timeout = timeout or self.default_timeout
@@ -430,9 +504,19 @@ class EditorAPIContext:
         del self._sse_futures[state_id]
         return event["status"] == "ok"
 
-    async def get_meta(self, state_id: str) -> dict[str, Any]:
+    async def get_meta(self, state_id: StateID) -> dict[str, Any]:
         response = await self.request("GET", f"state/meta/{state_id}")
         return response.json()
+
+    async def get_image(
+        self,
+        state_id: StateID,
+        image_format: Literal["JPEG", "PNG", "WEBP", "AUTO"] = "AUTO",
+        resolution: Literal["FULL", "DISPLAY"] = "FULL",
+    ) -> bytes:
+        params = {"format": image_format, "resolution": resolution}
+        response = await self.request("GET", f"state/image/{state_id}", params=params)
+        return response.content
 
     async def _run_one[Tin, Tout](
         self,
@@ -468,10 +552,10 @@ class EditorAPIContext:
         url: str,
         params: dict[str, Any] | None = None,
         timeout: float | None = None,
-    ) -> tuple[str, bool]:
+    ) -> tuple[StateID, bool]:
         params = {"priority": self.priority} | (params or {})
         response = await self.request("POST", f"skills/{url}", json=params)
-        state_id = response.json()["state"]
+        state_id: StateID = response.json()["state"]
         status = await self.sse_await(state_id, timeout=timeout)
         return state_id, status
 
@@ -480,9 +564,647 @@ class EditorAPIContext:
         url: str,
         params: dict[str, Any] | None = None,
         timeout: float | None = None,
-    ) -> str:
+    ) -> StateID:
         st, ok = await self.call_skill(url, params, timeout=timeout)
         if ok:
             return st
         meta = await self.get_meta(st)
         raise RuntimeError(f"skill {url} failed with {st}: {meta}")
+
+    @property
+    def call_async(self) -> "EditorApiAsyncClient":
+        return EditorApiAsyncClient(self)
+
+
+## High-level interface ##
+
+CreateStateErrorCode = Literal["file_too_large", "download_error", "invalid_image"]
+Trinary = Literal["yes", "no", "unknown"]
+Size2D = tuple[int, int]
+BoundingBox = tuple[int, int, int, int]
+Mode = Literal["express", "standard", "premium"]
+
+
+def _size2d(v: Any) -> Size2D:
+    assert isinstance(v, list)
+    v = cast(list[Any], v)
+    assert all(isinstance(x, int) for x in v)
+    r = cast(tuple[int, ...], tuple(v))
+    assert len(r) == 2
+    return r
+
+
+def _bbox(v: Any) -> BoundingBox:
+    assert isinstance(v, list)
+    v = cast(list[Any], v)
+    assert all(isinstance(x, int) for x in v)
+    r = cast(tuple[int, ...], tuple(v))
+    assert len(r) == 4
+    return r
+
+
+def _color(v: Any) -> tuple[int, int, int] | tuple[int, int, int, int]:
+    assert isinstance(v, list)
+    v = cast(list[Any], v)
+    assert all(isinstance(x, int) for x in v)
+    if len(v) == 3:
+        return cast(tuple[int, int, int], tuple(v))
+    elif len(v) == 4:
+        return cast(tuple[int, int, int, int], tuple(v))
+    else:
+        raise ValueError(f"unexpected color: {v}")
+
+
+@dc.dataclass(kw_only=True)
+class MetaResult:
+    state_id: StateID
+    meta: dict[str, Any]
+
+
+class OKResult(MetaResult):
+    @property
+    def input_states(self) -> list[StateID]:
+        v = self.meta.get("input_states", [])
+        assert isinstance(v, list)
+        v = cast(list[Any], v)
+        assert all(isinstance(x, str) for x in v)
+        return cast(list[StateID], v)
+
+    @property
+    def image_size(self) -> Size2D:
+        return _size2d(self.meta["image_size"])
+
+    @property
+    def credit_cost(self) -> int:
+        v = self.meta["credit_cost"]
+        assert isinstance(v, int)
+        return v
+
+
+@dc.dataclass(kw_only=True)
+class OKResultWithImage(OKResult):
+    image: bytes
+
+
+class ErrorResult(MetaResult):
+    @property
+    def error(self) -> str:
+        v = self.meta["error"]
+        assert isinstance(v, str)
+        return v
+
+
+class CreateStateResult(OKResult):
+    @property
+    def original_mimetype(self) -> str:
+        v = self.meta["original_mimetype"]
+        assert isinstance(v, str)
+        return v
+
+
+class CreateStateError(ErrorResult):
+    @property
+    def error_code(self) -> CreateStateErrorCode:
+        v = self.meta["error_code"]
+        assert v in get_args(CreateStateErrorCode)
+        return v
+
+
+class InferIsProductResult(OKResult):
+    @property
+    def is_product(self) -> Trinary:
+        v = self.meta["is_product"]
+        assert v in get_args(Trinary)
+        return v
+
+
+class InferProductNameResult(OKResult):
+    @property
+    def is_product(self) -> str:
+        v = self.meta["product_name"]
+        assert isinstance(v, str)
+        return v
+
+
+class InferMainSubjectResult(OKResult):
+    @property
+    def main_subject(self) -> str:
+        v = self.meta["main_subject"]
+        assert isinstance(v, str)
+        return v
+
+
+class InferCommercialDescriptionResult(OKResult):
+    @property
+    def commercial_description_en(self) -> str:
+        v = self.meta["commercial_description_en"]
+        assert isinstance(v, str)
+        return v
+
+
+class InferBoundingBoxResult(OKResult):
+    @property
+    def bbox(self) -> BoundingBox:
+        return _bbox(self.meta["bbox"])
+
+
+class SegmentResult(OKResult):
+    pass
+
+
+class SegmentResultWithImage(OKResultWithImage, SegmentResult):
+    @property
+    def mask(self) -> bytes:
+        return self.image
+
+
+class OKResultWithUsedSeeds(OKResult):
+    @property
+    def used_seeds(self) -> list[int]:
+        v = self.meta.get("used_seeds", [])
+        assert isinstance(v, list)
+        v = cast(list[Any], v)
+        assert all(isinstance(x, int) for x in v)
+        return cast(list[int], v)
+
+
+class EraseResult(OKResultWithUsedSeeds):
+    pass
+
+
+class EraseResultWithImage(OKResultWithImage, EraseResult):
+    pass
+
+
+class BlendResult(OKResultWithUsedSeeds):
+    @property
+    def input_bbox(self) -> BoundingBox:
+        return _bbox(self.meta["input_bbox"])
+
+    @property
+    def blended_bbox(self) -> BoundingBox:
+        return _bbox(self.meta["blended_bbox"])
+
+    @property
+    def crop_bbox(self) -> BoundingBox | None:
+        if "crop_bbox" not in self.meta:
+            return None
+        return _bbox(self.meta["crop_bbox"])
+
+
+class BlendResultWithImage(OKResultWithImage, BlendResult):
+    pass
+
+
+class UpscaleResult(OKResultWithUsedSeeds):
+    pass
+
+
+class UpscaleResultWithImage(OKResultWithImage, UpscaleResult):
+    pass
+
+
+class ShadowResult(OKResultWithUsedSeeds):
+    @property
+    def input_bbox(self) -> BoundingBox | None:
+        if "input_bbox" not in self.meta:
+            return None
+        return _bbox(self.meta["input_bbox"])
+
+    @property
+    def output_bbox(self) -> BoundingBox:
+        return _bbox(self.meta["output_bbox"])
+
+    @property
+    def crop_bbox(self) -> BoundingBox | None:
+        if "crop_bbox" not in self.meta:
+            return None
+        return _bbox(self.meta["crop_bbox"])
+
+
+class ShadowResultWithImage(OKResultWithImage, ShadowResult):
+    pass
+
+
+class RecolorResult(OKResult):
+    @property
+    def color(self) -> tuple[int, int, int] | tuple[int, int, int, int]:
+        return _color(self.meta["color"])
+
+
+class RecolorResultWithImage(OKResultWithImage, RecolorResult):
+    pass
+
+
+class CutoutResult(OKResult):
+    @property
+    def mask_bbox(self) -> BoundingBox:
+        return _bbox(self.meta["mask_bbox"])
+
+
+class CutoutResultWithImage(OKResultWithImage, CutoutResult):
+    pass
+
+
+class CropResult(OKResult):
+    @property
+    def crop_bbox(self) -> BoundingBox:
+        return _bbox(self.meta["crop_bbox"])
+
+
+class CropResultWithImage(OKResultWithImage, CropResult):
+    pass
+
+
+class MergeMasksResult(OKResult):
+    pass
+
+
+class MergeMasksResultWithImage(OKResultWithImage, MergeMasksResult):
+    pass
+
+
+class SetBackgroundColorResult(OKResult):
+    @property
+    def background(self) -> tuple[int, int, int] | tuple[int, int, int, int]:
+        return _color(self.meta["background"])
+
+
+class SetBackgroundColorResultWithImage(OKResultWithImage, SetBackgroundColorResult):
+    pass
+
+
+@dc.dataclass(kw_only=True)
+class MergeCutoutsEntry:
+    state_id: StateID
+    bbox: BoundingBox
+    flip: bool = False
+    rotation_angle: float = 0.0
+
+    @property
+    def as_options(self) -> dict[str, Any]:
+        r: dict[str, Any] = {"bbox": list(self.bbox)}
+        if self.flip:
+            r["flip"] = True
+        if self.rotation_angle:
+            r["rotation_angle"] = self.rotation_angle
+        return r
+
+
+class MergeCutoutsResult(OKResult):
+    pass
+
+
+class MergeCutoutsResultWithImage(OKResultWithImage, MergeCutoutsResult):
+    pass
+
+
+@dc.dataclass(kw_only=True)
+class ImageOutParams:
+    image_format: Literal["JPEG", "PNG", "WEBP", "AUTO"] = "AUTO"
+    resolution: Literal["FULL", "DISPLAY"] = "FULL"
+
+
+class EditorApiAsyncClient:
+    def __init__(self, ctx: EditorAPIContext) -> None:
+        self.ctx = ctx
+
+    async def upload_image(self, file: BinaryIO | bytes) -> StateID:
+        response = await self.ctx.request("POST", "state/upload", files={"file": file})
+        return response.json()["state"]
+
+    async def _create_state(
+        self,
+        file: BinaryIO | bytes | None,
+        file_url: str | None = None,
+        meta: dict[str, Any] | None = None,
+        timeout: float | None = 30.0,
+    ) -> tuple[StateID, bool]:
+        if (file is not None) and (file_url is not None):
+            raise ValueError("cannot specify both file and file_url")
+        files = None if file is None else {"file": file}
+        data: dict[str, str] = {}
+        if file_url is not None:
+            data["file_url"] = file_url
+        if meta is not None:
+            data["meta"] = json.dumps(meta)
+        response = await self.ctx.request("POST", "state/create", files=files, data=data)
+        state_id: StateID = response.json()["state"]
+        status = await self.ctx.sse_await(state_id, timeout=timeout)
+        return state_id, status
+
+    async def _response[Tok: OKResult, Tko: ErrorResult](
+        self,
+        st: StateID,
+        ok: bool,
+        t_ok: type[Tok] = OKResult,
+        t_ko: type[Tko] = ErrorResult,
+    ) -> Tok | Tko:
+        meta = await self.ctx.get_meta(st)
+        if ok:
+            assert meta["status"] == "ok"
+            return t_ok(state_id=st, meta=meta)
+        else:
+            assert meta["status"] == "ko"
+            return t_ko(state_id=st, meta=meta)
+
+    async def _response_with_image[Tok: OKResultWithImage, Tko: ErrorResult](
+        self,
+        st: StateID,
+        ok: bool,
+        t_ok: type[Tok] = OKResultWithImage,
+        t_ko: type[Tko] = ErrorResult,
+        params: ImageOutParams | None = None,
+    ) -> Tok | Tko:
+        if ok:
+            if params is None:
+                params = ImageOutParams()
+            async with asyncio.TaskGroup() as tg:
+                meta_f = tg.create_task(self.ctx.get_meta(st))
+                image_f = tg.create_task(self.ctx.get_image(st, params.image_format, params.resolution))
+            meta = meta_f.result()
+            image = image_f.result()
+            assert meta["status"] == "ok"
+            return t_ok(state_id=st, meta=meta, image=image)
+        else:
+            meta = await self.ctx.get_meta(st)
+            assert meta["status"] == "ko"
+            return t_ko(state_id=st, meta=meta)
+
+    async def create_state(
+        self,
+        file: BinaryIO | bytes | None = None,
+        file_url: str | None = None,
+        meta: dict[str, Any] | None = None,
+        timeout: float | None = 30.0,
+    ) -> CreateStateResult | CreateStateError:
+        st, ok = await self._create_state(file, file_url, meta, timeout)
+        return await self._response(st, ok, CreateStateResult, CreateStateError)
+
+    async def infer_is_product(
+        self,
+        state_id: StateID,
+        timeout: float | None = None,
+    ) -> InferIsProductResult | ErrorResult:
+        st, ok = await self.ctx.call_skill(f"infer-is-product/{state_id}", timeout=timeout)
+        return await self._response(st, ok, InferIsProductResult)
+
+    async def infer_product_name(
+        self,
+        state_id: StateID,
+        timeout: float | None = None,
+    ) -> InferProductNameResult | ErrorResult:
+        st, ok = await self.ctx.call_skill(f"infer-product-name/{state_id}", timeout=timeout)
+        return await self._response(st, ok, InferProductNameResult)
+
+    async def infer_main_subject(
+        self,
+        state_id: StateID,
+        timeout: float | None = None,
+    ) -> InferMainSubjectResult | ErrorResult:
+        st, ok = await self.ctx.call_skill(f"infer-main-subject/{state_id}", timeout=timeout)
+        return await self._response(st, ok, InferMainSubjectResult)
+
+    async def infer_commercial_description(
+        self,
+        state_id: StateID,
+        product_name: str | None = None,
+        timeout: float | None = None,
+    ) -> InferCommercialDescriptionResult | ErrorResult:
+        params: dict[str, Any] = {}
+        if product_name is not None:
+            params["product_name"] = product_name
+        st, ok = await self.ctx.call_skill(
+            f"infer-commercial-description/{state_id}",
+            params,
+            timeout=timeout,
+        )
+        return await self._response(st, ok, InferCommercialDescriptionResult)
+
+    async def infer_bbox(
+        self,
+        state_id: StateID,
+        product_name: str | None = None,
+        timeout: float | None = None,
+    ) -> InferBoundingBoxResult | ErrorResult:
+        params: dict[str, Any] = {}
+        if product_name is not None:
+            params["product_name"] = product_name
+        st, ok = await self.ctx.call_skill(
+            f"infer-bbox/{state_id}",
+            params,
+            timeout=timeout,
+        )
+        return await self._response(st, ok, InferBoundingBoxResult)
+
+    async def segment(
+        self,
+        state_id: StateID,
+        bbox: BoundingBox | None = None,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> SegmentResult | ErrorResult:
+        params: dict[str, Any] = {}
+        if bbox is not None:
+            params["bbox"] = list(bbox)
+        st, ok = await self.ctx.call_skill(f"segment/{state_id}", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, SegmentResultWithImage, params=image_params)
+        return await self._response(st, ok, SegmentResult)
+
+    async def erase(
+        self,
+        image_state_id: StateID,
+        mask_state_id: StateID,
+        seed: int | None = None,
+        mode: Mode = "standard",
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> EraseResult | ErrorResult:
+        params: dict[str, Any] = {"mode": mode}
+        if seed is not None:
+            params["seed"] = seed
+        st, ok = await self.ctx.call_skill(
+            f"erase/{image_state_id}/{mask_state_id}",
+            params,
+            timeout=timeout,
+        )
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, EraseResultWithImage, params=image_params)
+        return await self._response(st, ok, EraseResult)
+
+    async def blend(
+        self,
+        image_state_id: StateID,
+        mask_state_id: StateID,
+        bbox: BoundingBox | None = None,
+        flip: bool = False,
+        rotation_angle: float = 0.0,
+        seed: int | None = None,
+        mode: Mode = "standard",
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> BlendResult | ErrorResult:
+        params: dict[str, Any] = {
+            "mode": mode,
+            "flip": flip,
+            "rotation_angle": rotation_angle,
+        }
+        if bbox is not None:
+            params["bbox"] = list(bbox)
+        if seed is not None:
+            params["seed"] = seed
+        st, ok = await self.ctx.call_skill(
+            f"blend/{image_state_id}/{mask_state_id}",
+            params,
+            timeout=timeout,
+        )
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, BlendResultWithImage, params=image_params)
+        return await self._response(st, ok, BlendResult)
+
+    async def upscale(
+        self,
+        state_id: StateID,
+        preprocess: bool = True,
+        scale_factor: Literal[1, 2, 4] = 2,
+        resemblance: float | None = None,
+        decay: float | None = None,
+        creativity: float | None = None,
+        seed: int | None = None,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> UpscaleResult | ErrorResult:
+        params: dict[str, Any] = {"preprocess": preprocess, "scale_factor": scale_factor}
+        if resemblance is not None:
+            params["resemblance"] = resemblance
+        if decay is not None:
+            params["decay"] = decay
+        if creativity is not None:
+            params["creativity"] = creativity
+        if seed is not None:
+            params["seed"] = seed
+        st, ok = await self.ctx.call_skill(f"upscale/{state_id}", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, UpscaleResultWithImage, params=image_params)
+        return await self._response(st, ok, UpscaleResult)
+
+    async def shadow(
+        self,
+        state_id: StateID,
+        resolution: Size2D | None = None,
+        bbox: BoundingBox | None = None,
+        background: str | None = None,
+        seed: int | None = None,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> ShadowResult | ErrorResult:
+        params: dict[str, Any] = {}
+        if resolution is not None:
+            params["resolution"] = list(resolution)
+        if bbox is not None:
+            params["bbox"] = list(bbox)
+        if background is not None:
+            params["background"] = background
+        if seed is not None:
+            params["seed"] = seed
+        st, ok = await self.ctx.call_skill(f"shadow/{state_id}", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, ShadowResultWithImage, params=image_params)
+        return await self._response(st, ok, ShadowResult)
+
+    async def recolor(
+        self,
+        image_state_id: StateID,
+        mask_state_id: StateID,
+        color: str,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> RecolorResult | ErrorResult:
+        params: dict[str, Any] = {"color": color}
+        st, ok = await self.ctx.call_skill(
+            f"recolor/{image_state_id}/{mask_state_id}",
+            params,
+            timeout=timeout,
+        )
+        if with_image:
+            return await self._response_with_image(st, ok, RecolorResultWithImage)
+        return await self._response(st, ok, RecolorResult)
+
+    async def cutout(
+        self,
+        image_state_id: StateID,
+        mask_state_id: StateID,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> CutoutResult | ErrorResult:
+        st, ok = await self.ctx.call_skill(f"cutout/{image_state_id}/{mask_state_id}", timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, CutoutResultWithImage, params=image_params)
+        return await self._response(st, ok, CutoutResult)
+
+    async def crop(
+        self,
+        state_id: StateID,
+        bbox: BoundingBox | None = None,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> CropResult | ErrorResult:
+        params: dict[str, Any] = {}
+        if bbox is not None:
+            params["bbox"] = list(bbox)
+        st, ok = await self.ctx.call_skill(f"crop/{state_id}", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, CropResultWithImage, params=image_params)
+        return await self._response(st, ok, CropResult)
+
+    async def merge_masks(
+        self,
+        state_ids: list[StateID],
+        operation: Literal["union", "difference"] = "union",
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> MergeMasksResult | ErrorResult:
+        params: dict[str, Any] = {"operation": operation, "states": state_ids}
+        st, ok = await self.ctx.call_skill("merge-masks", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, MergeMasksResultWithImage, params=image_params)
+        return await self._response(st, ok, MergeMasksResult)
+
+    async def merge_cutouts(
+        self,
+        resolution: Size2D,
+        cutouts: list[MergeCutoutsEntry],
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> MergeCutoutsResult | ErrorResult:
+        state_ids: list[StateID] = [e.state_id for e in cutouts]
+        options: list[dict[str, Any]] = [e.as_options for e in cutouts]
+        params: dict[str, Any] = {"resolution": resolution, "states": state_ids, "options": options}
+        st, ok = await self.ctx.call_skill("merge-cutouts", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, MergeCutoutsResultWithImage, params=image_params)
+        return await self._response(st, ok, MergeCutoutsResult)
+
+    async def set_background_color(
+        self,
+        state_id: StateID,
+        background: str,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> SetBackgroundColorResult | ErrorResult:
+        params: dict[str, Any] = {"background": background}
+        st, ok = await self.ctx.call_skill(f"set-background-color/{state_id}", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, SetBackgroundColorResultWithImage, params=image_params)
+        return await self._response(st, ok, SetBackgroundColorResult)

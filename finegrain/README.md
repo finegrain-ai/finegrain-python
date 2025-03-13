@@ -4,48 +4,35 @@ This is a client for the [Finegrain](https://finegrain.ai) API. It requires Pyth
 
 ## Usage
 
-Here is an example script to erase an object from an image by prompt.
+See [this example script](examples/erase.py) to erase an object from an image by prompt.
 
-```py
-import argparse
-import asyncio
+If you run in a synchronous context and do not want to manage asyncio, see [this example](examples/erase_sync.py) instead.
 
-from finegrain import EditorAPIContext
+## Running tests
 
+You need API credentials (an API key or an email and a password) to run tests. Be careful: doing so will use credits!
 
-async def co(ctx: EditorAPIContext, prompt: str, path_in: str, path_out: str) -> None:
-    await ctx.login()
-    await ctx.sse_start()
+To install dependencies, install [Rye](https://rye.astral.sh) and run:
 
-    with open(path_in, "rb") as f:
-        response = await ctx.request("POST", "state/upload", files={"file": f})
-    st_input = response.json()["state"]
+```bash
+rye sync
+```
 
-    st_boxed = await ctx.ensure_skill(f"infer-bbox/{st_input}", {"product_name": prompt})
-    st_mask = await ctx.ensure_skill(f"segment/{st_boxed}")
-    st_erased = await ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": "express"})
+The most basic way to run tests is:
 
-    response = await ctx.request(
-        "GET",
-        f"state/image/{st_erased}",
-        params={"format": "WEBP", "resolution": "DISPLAY"},
-    )
+```bash
+FG_API_CREDENTIALS=FGAPI-ABCDEF-123456-7890AB-CDEF12 rye test
+```
 
-    with open(path_out, "wb") as f:
-        f.write(response.content)
+If you run tests to debug something you can use for instance:
 
-    await ctx.sse_stop()
+```bash
+odir="/tmp/api-tests-$(date '+%Y-%m-%d-%H-%M-%S')"
+mkdir -p "$odir"
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--user", type=str, required=True, help="API login")
-    parser.add_argument("--password", type=str, required=True, help="API password")
-    parser.add_argument("--prompt", type=str, required=True, help="What to remove?")
-    parser.add_argument("--input-file", type=str, default="before.webp", help="Input file path")
-    parser.add_argument("--output-file", type=str, default="after.webp", help="Output file path")
-    args = parser.parse_args()
-
-    ctx = EditorAPIContext(user=args.user, password=args.password)
-    asyncio.run(co(ctx, args.prompt, args.input_file, args.output_file))
+FG_API_CREDENTIALS=FGAPI-ABCDEF-123456-7890AB-CDEF12 \
+FG_API_URL="https://.../editor" \
+FG_TESTS_OUTPUT_DIR="$odir" \
+    rye run pytest -v \
+    -s -o log_cli=true -o log_level=INFO
 ```
