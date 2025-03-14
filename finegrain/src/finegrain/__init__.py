@@ -709,6 +709,25 @@ class InferBoundingBoxResult(OKResult):
         return _bbox(self.meta["bbox"])
 
 
+@dc.dataclass(kw_only=True)
+class SingleDetectResult:
+    bbox: BoundingBox
+    label: str
+
+
+class DetectResult(OKResult):
+    @property
+    def results(self) -> list[SingleDetectResult]:
+        r: list[SingleDetectResult] = []
+        vs = self.meta["results"]
+        assert isinstance(vs, list)
+        for v in cast(list[Any], vs):
+            assert isinstance(v, dict)
+            assert isinstance(v["label"], str)
+            r.append(SingleDetectResult(bbox=_bbox(v["bbox"]), label=v["label"]))
+        return r
+
+
 class SegmentResult(OKResult):
     pass
 
@@ -997,6 +1016,15 @@ class EditorApiAsyncClient:
             timeout=timeout,
         )
         return await self._response(st, ok, InferBoundingBoxResult)
+
+    async def detect(
+        self,
+        state_id: StateID,
+        prompt: str,
+        timeout: float | None = None,
+    ) -> DetectResult | ErrorResult:
+        st, ok = await self.ctx.call_skill(f"detect/{state_id}", {"prompt": prompt}, timeout=timeout)
+        return await self._response(st, ok, DetectResult)
 
     async def segment(
         self,
