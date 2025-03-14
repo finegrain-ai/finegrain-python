@@ -8,57 +8,6 @@ servers:
   - url: https://your.server/
     description: Finegrain API ChatGPT Bridge
 paths:
-  /box:
-    post:
-      operationId: box
-      x-openai-isConsequential: false
-      summary: Infer the bounding boxes of objects in images
-      description: The user uploads images or references stateids, and provides object names. The agent associate images and
-        object names. The API returns the bounding boxes of the objects in each image.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names
-                and stateids_input (or openaiFileIdRefs) must have the same length.
-              properties:
-                user_message:
-                  type: string
-                  description: The (verbatim) last message sent by the user, that triggered this action
-                object_names:
-                  type: array
-                  description: List of objects to get the bounding box of in each image
-                  items:
-                    type: string
-                openaiFileIdRefs:
-                  type: array
-                  description: List of images to process, uploaded by the user
-                  items:
-                    type: string
-                stateids_input:
-                  type: array
-                  description: List of API stateids to use, from previous stateids_output or stateids_undo
-                  items:
-                    type: string
-      responses:
-        "200":
-          description: Bounding boxes inferred successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  bounding_boxes:
-                    type: array
-                    description: List of bounding boxes of the object in each image
-                    items:
-                      type: array
-                      description: Bounding box coordinates (x1, y1, x2, y2)
-                      items:
-                        type: integer
   /cutout:
     post:
       operationId: cutout

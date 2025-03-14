@@ -73,12 +73,6 @@ async def handle_value_error(error: ValueError) -> Response:
     return json_error(str(error))
 
 
-@app.post("/box")
-@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
-async def infer_bbox() -> Any:
-    return await _box(ctx, request)
-
-
 @app.post("/cutout")
 @require_basic_auth_token(CHATGPT_AUTH_TOKEN)
 async def cutout() -> Any:
