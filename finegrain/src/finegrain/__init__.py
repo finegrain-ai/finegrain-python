@@ -545,6 +545,7 @@ class EditorAPIContext:
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+        self._sse_futures = Futures()  # reset because loop may have changed
         return loop.run_until_complete(self._run_one(co, params))
 
     async def call_skill(
