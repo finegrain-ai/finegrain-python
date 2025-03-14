@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO
 from textwrap import dedent
@@ -40,12 +39,6 @@ def is_error(result: Any) -> TypeIs[ErrorResult]:
     if isinstance(result, ErrorResult):
         raise RuntimeError(result.error)
     return False
-
-
-def detect_to_found(dr: DetectResult) -> str:
-    # e.g; 1 x 'book', 2 x 'vase'
-    ctr = Counter(r.label for r in dr.results)
-    return ", ".join([f"{count} x '{label}'" for label, count in ctr.items()])
 
 
 class UserInputError(app_commands.AppCommandError):
@@ -293,9 +286,9 @@ async def erase(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image, detect_result = await _call_object_eraser(bot.api_ctx, input_image, prompt)
+    output_image, _ = await _call_object_eraser(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
-    reply = f"\N{SPONGE} Before/After for prompt '{prompt}'. I erased {detect_to_found(detect_result)}:"
+    reply = f"\N{SPONGE} Before/After for prompt '{prompt}':"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
     await interaction.followup.send(reply, files=before_after)
 
@@ -315,9 +308,9 @@ async def extract(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image, detect_result = await _call_object_cutter(bot.api_ctx, input_image, prompt)
+    output_image, _ = await _call_object_cutter(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
-    reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}'. I extracted {detect_to_found(detect_result)}:"
+    reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}':"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
     await interaction.followup.send(reply, files=before_after)
 
