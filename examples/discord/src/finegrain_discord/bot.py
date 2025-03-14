@@ -92,6 +92,7 @@ api_ctx = EditorAPIContext(
     password=API_PASSWORD,
     priority=API_PRIORITY,
     verify=API_VERIFY,
+    user_agent="finegrain-discord-bot",
 )
 bot = FinegrainBot(api_ctx, intents=intents)
 
