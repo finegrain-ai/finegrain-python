@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO
 from textwrap import dedent
@@ -8,8 +9,9 @@ from typing import Any, Literal
 import discord
 from discord import Intents, app_commands
 from environs import Env
-from finegrain import EditorAPIContext, Priority
+from finegrain import DetectResult, EditorAPIContext, ErrorResult, Priority, StateID
 from PIL import Image
+from typing_extensions import TypeIs
 
 env = Env()
 env.read_env()
@@ -32,6 +34,18 @@ DISCORD_GUILD = discord.Object(id=DISCORD_GUILD_ID)  # aka "server" in the Disco
 ALLOWED_IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp")
 API_PRIORITY: Priority = "standard"
 SCISSORS_EMOJI = "\u2702\ufe0f"
+
+
+def is_error(result: Any) -> TypeIs[ErrorResult]:
+    if isinstance(result, ErrorResult):
+        raise RuntimeError(result.error)
+    return False
+
+
+def detect_to_found(dr: DetectResult) -> str:
+    # e.g; 1 x 'book', 2 x 'vase'
+    ctr = Counter(r.label for r in dr.results)
+    return ", ".join([f"{count} x '{label}'" for label, count in ctr.items()])
 
 
 class UserInputError(app_commands.AppCommandError):
@@ -96,8 +110,8 @@ class BotImage:
     uid: int | str
     content_type: str
     data: bytes
-    width: int | None = None
-    height: int | None = None
+    width: int
+    height: int
 
     @classmethod
     async def from_attachment(cls, attachment: discord.Attachment) -> "BotImage":
@@ -123,44 +137,13 @@ class BotImage:
                     uid=self.uid,
                     content_type="image/webp",
                     data=of.getvalue(),
+                    width=img.width,
+                    height=img.height,
                 )
 
     def to_discord_file(self) -> discord.File:
         filename = f"{self.uid}.{self.content_type.split('/')[1]}"
         return discord.File(BytesIO(self.data), filename=filename)
-
-
-@dataclass
-class DetectResult:
-    bbox: tuple[int, int, int, int]
-    label: str
-
-
-@dataclass
-class DetectOutput:
-    results: list[DetectResult]
-
-    @classmethod
-    def parse_meta(cls, meta: dict[str, Any]) -> "DetectOutput":
-        assert "results" in meta
-        results: list[DetectResult] = []
-        for r in meta["results"]:
-            assert "bbox" in r
-            assert isinstance(r["bbox"], list)
-            assert len(r["bbox"]) == 4
-            assert all(isinstance(i, int) for i in r["bbox"])
-            assert "label" in r
-            assert isinstance(r["label"], str)
-            results.append(DetectResult(bbox=tuple(r["bbox"]), label=r["label"]))
-        return cls(results=results)
-
-    @property
-    def found(self) -> str:
-        # e.g; 1 x 'book', 2 x 'vase'
-        return ", ".join(
-            f"{len([r for r in self.results if r.label == label])} x '{label}'"
-            for label in set(r.label for r in self.results)
-        )
 
 
 def _get_max_upload_size(interaction: discord.Interaction) -> int | None:
@@ -169,71 +152,64 @@ def _get_max_upload_size(interaction: discord.Interaction) -> int | None:
     return guild.filesize_limit if guild is not None else None
 
 
-async def _call_multi_segment(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> tuple[str, str, DetectOutput]:
+async def _call_multi_segment(
+    api_ctx: EditorAPIContext,
+    image: BotImage,
+    prompt: str,
+) -> tuple[StateID, StateID, DetectResult]:
     with BytesIO() as f:
         f.write(image.data)
-        response = await api_ctx.request("POST", "state/upload", files={"file": f})
-    st_input = response.json()["state"]
+        st_input = await api_ctx.call_async.upload_image(f)
 
-    st_detect = await api_ctx.ensure_skill(f"detect/{st_input}", {"prompt": prompt})
-    meta_detect = await api_ctx.get_meta(st_detect)
-
-    detect_output = DetectOutput.parse_meta(meta_detect)
-    if not detect_output.results:
+    r_detect = await api_ctx.call_async.detect(st_input, prompt=prompt)
+    assert not is_error(r_detect)
+    if not r_detect.results:
         raise ObjectNotFoundError(prompt=prompt)
 
     async with asyncio.TaskGroup() as tg:
-        segmentations = [
-            tg.create_task(api_ctx.ensure_skill(f"segment/{st_input}", {"bbox": target.bbox}))
-            for target in detect_output.results
-        ]
+        bboxes = [target.bbox for target in r_detect.results]
+        segmentation_responses = [tg.create_task(api_ctx.call_async.segment(st_input, bbox=bbox)) for bbox in bboxes]
 
-    st_masks = [segmentation.result() for segmentation in segmentations]
+    segmentation_results = [r.result() for r in segmentation_responses]
+    if any(isinstance(r, ErrorResult) for r in segmentation_results):
+        err = next(r for r in segmentation_results if isinstance(r, ErrorResult))
+        raise RuntimeError(err.error)
+
+    st_masks = [r.state_id for r in segmentation_results]
     if len(st_masks) == 1:
         st_mask = st_masks[0]
     else:
-        st_mask = await api_ctx.ensure_skill("merge-masks", {"operation": "union", "states": st_masks})
+        merge_r = await api_ctx.call_async.merge_masks(st_masks, operation="union")
+        assert not is_error(merge_r)
+        st_mask = merge_r.state_id
 
-    return st_input, st_mask, detect_output
+    return st_input, st_mask, r_detect
 
 
 async def _call_object_eraser(
     api_ctx: EditorAPIContext, image: BotImage, prompt: str, mode: Literal["express", "standard", "premium"] = "premium"
-) -> tuple[BotImage, DetectOutput]:
-    st_input, st_mask, detect_output = await _call_multi_segment(api_ctx, image, prompt)
-
-    st_erased = await api_ctx.ensure_skill(f"erase/{st_input}/{st_mask}", {"mode": mode})
-
-    response = await api_ctx.request(
-        "GET",
-        f"state/image/{st_erased}",
-        params={"format": "JPEG"},  # FULL resolution by default
-    )
-
+) -> tuple[BotImage, DetectResult]:
+    st_input, st_mask, detect_result = await _call_multi_segment(api_ctx, image, prompt)
+    erase_r = await api_ctx.call_async.erase(st_input, st_mask, mode=mode)
+    assert not is_error(erase_r)
+    image_bytes = await api_ctx.get_image(erase_r.state_id, image_format="JPEG")
     return BotImage(
-        uid=st_erased,
+        uid=erase_r.state_id,
         content_type="image/jpeg",
-        data=response.content,
-    ), detect_output
+        data=image_bytes,
+        width=erase_r.image_size[0],
+        height=erase_r.image_size[1],
+    ), detect_result
 
 
-async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> tuple[BotImage, DetectOutput]:
-    st_input, st_mask, detect_output = await _call_multi_segment(api_ctx, image, prompt)
-
-    st_cutout = await api_ctx.ensure_skill(f"cutout/{st_input}/{st_mask}")
-
-    response = await api_ctx.request(
-        "GET",
-        f"state/image/{st_cutout}",
-        params={"format": "PNG"},  # FULL resolution by default
-    )
-    cutout = Image.open(BytesIO(response.content))
-
-    meta_cutout = await api_ctx.get_meta(st_cutout)
-    assert "image_size" in meta_cutout
-    hd_cutout_size = meta_cutout["image_size"]
-    assert "mask_bbox" in meta_cutout
-    left, upper = meta_cutout["mask_bbox"][:2]
+async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> tuple[BotImage, DetectResult]:
+    st_input, st_mask, detect_result = await _call_multi_segment(api_ctx, image, prompt)
+    cutout_r = await api_ctx.call_async.cutout(st_input, st_mask)
+    assert not is_error(cutout_r)
+    cutout_bytes = await api_ctx.get_image(cutout_r.state_id, image_format="PNG")
+    cutout = Image.open(BytesIO(cutout_bytes))
+    hd_cutout_size = cutout_r.image_size
+    left, upper = cutout_r.mask_bbox[:2]
 
     # Rescaling - should only be needed if DISPLAY resolution is used instead of FULL
     downscale_w, downscale_h = cutout.width / hd_cutout_size[0], cutout.height / hd_cutout_size[1]
@@ -246,10 +222,12 @@ async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt
     with BytesIO() as f:
         output_image.save(f, format="PNG")
         return BotImage(
-            uid=st_cutout,
+            uid=cutout_r.state_id,
             content_type="image/png",
             data=f.getvalue(),
-        ), detect_output
+            width=output_size[0],
+            height=output_size[1],
+        ), detect_result
 
 
 async def _load_attached_image(attachment: discord.Attachment) -> BotImage:
@@ -315,9 +293,9 @@ async def erase(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image, detect_output = await _call_object_eraser(bot.api_ctx, input_image, prompt)
+    output_image, detect_result = await _call_object_eraser(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
-    reply = f"\N{SPONGE} Before/After for prompt '{prompt}'. I erased {detect_output.found}:"
+    reply = f"\N{SPONGE} Before/After for prompt '{prompt}'. I erased {detect_to_found(detect_result)}:"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
     await interaction.followup.send(reply, files=before_after)
 
@@ -337,9 +315,9 @@ async def extract(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image, detect_output = await _call_object_cutter(bot.api_ctx, input_image, prompt)
+    output_image, detect_result = await _call_object_cutter(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
-    reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}'. I extracted {detect_output.found}:"
+    reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}'. I extracted {detect_to_found(detect_result)}:"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
     await interaction.followup.send(reply, files=before_after)
 
