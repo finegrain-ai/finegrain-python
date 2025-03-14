@@ -27,9 +27,9 @@ certifi==2025.1.31
 click==8.1.8
     # via flask
     # via quart
-environs==14.1.0
+environs==14.1.1
     # via chatgpt-bridge
-finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@12886f630f805119670eb24c9b58a5aa97335a1f#subdirectory=finegrain
+finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git@7f397f68d6a1bf7d5a567500dfdaf02ed462649d#subdirectory=finegrain
     # via chatgpt-bridge
 flask==3.1.0
     # via quart
@@ -57,7 +57,7 @@ idna==3.10
 itsdangerous==2.2.0
     # via flask
     # via quart
-jinja2==3.1.5
+jinja2==3.1.6
     # via flask
     # via quart
 markupsafe==3.0.2
