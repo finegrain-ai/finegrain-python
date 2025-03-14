@@ -4,7 +4,7 @@ authors = [
 ]
 dependencies = [
     "environs>=14.1.0",
-    "finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git#subdirectory=finegrain",
+    "finegrain",
     "pillow>=11.1.0",
     "pydantic>=2.10.5",
     "quart>=0.20.0",
@@ -13,22 +13,26 @@ description = "Finegrain API ChatGPT bridge"
 name = "chatgpt-bridge"
 readme = "README.md"
 requires-python = ">= 3.12"
-version = "0.1.0"
+version = "1.0.0"
 
-[tool.rye]
+[tool.uv]
 dev-dependencies = [
     "pyright>=1.1.396",
     "ruff>=0.11.0",
     "typos>=1.30.0",
 ]
-managed = true
+package = true
+
+[tool.uv.sources]
+finegrain = { git = "https://github.com/finegrain-ai/finegrain-python.git", subdirectory = "finegrain" }
 
 [build-system]
 build-backend = "hatchling.build"
-requires = ["hatchling"]
+requires = ["hatch-vcs", "hatchling"]
 
-[tool.hatch.metadata]
-allow-direct-references = true
+[tool.hatch.version]
+fallback-version = '0.0.0'
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/chatgpt_bridge"]
@@ -72,7 +76,3 @@ reportMissingImports = true
 reportMissingTypeStubs = false
 reportPrivateUsage = false
 reportUntypedFunctionDecorator = false
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-log_cli = true
