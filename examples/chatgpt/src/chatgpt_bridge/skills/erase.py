@@ -1,9 +1,10 @@
+from finegrain import BoundingBox, ErrorResult, StateID
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.context import EditorAPIContextCached
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
+from chatgpt_bridge.context import EditorAPIContext
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse
 
 
 class EraseParams(BaseModel):
@@ -19,45 +20,62 @@ class EraseOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContextCached,
+    ctx: EditorAPIContext,
     stateid_input: StateID,
     object_names: list[str],
 ) -> StateID:
-    # queue skills/infer-bbox
-    stateids_bbox = []
+    # call infer-bbox for each object
+    bboxes: list[BoundingBox] = []
     for name in object_names:
-        stateid_bbox = await ctx.skill_bbox(stateid_image=stateid_input, product_name=name)
-        app.logger.debug(f"{stateid_bbox=}")
-        stateids_bbox.append(stateid_bbox)
-    app.logger.debug(f"{stateids_bbox=}")
+        result_bbox = await ctx.call_async.infer_bbox(
+            state_id=stateid_input,
+            product_name=name,
+        )
+        if isinstance(result_bbox, ErrorResult):
+            raise ValueError(f"Eraser internal infer_bbox error: {result_bbox.error}")
+        bboxes.append(result_bbox.bbox)
+    app.logger.debug(f"{bboxes=}")
 
-    # queue skills/segment
-    stateids_mask = []
-    for stateid_bbox in stateids_bbox:
-        stateid_mask = await ctx.skill_segment(stateid_bbox=stateid_bbox)
-        app.logger.debug(f"{stateid_mask=}")
-        stateids_mask.append(stateid_mask)
-    app.logger.debug(f"{stateids_mask=}")
+    # call segment for each bbox
+    stateids_segment = []
+    for result_bbox in bboxes:
+        result_segment = await ctx.call_async.segment(
+            state_id=stateid_input,
+            bbox=result_bbox,
+        )
+        if isinstance(result_segment, ErrorResult):
+            raise ValueError(f"Erase internal segment error: {result_segment.error}")
+        stateids_segment.append(result_segment.state_id)
+    app.logger.debug(f"{stateids_segment=}")
 
-    # queue skills/merge-masks for positive objects
-    if len(stateids_mask) == 1:
-        stateid_mask_union = stateids_mask[0]
+    # call merge-masks
+    if len(stateids_segment) == 1:
+        stateid_mask_union = stateids_segment[0]
     else:
-        stateid_mask_union = await ctx.skill_merge_masks(stateids=tuple(stateids_mask), operation="union")
+        result_mask_union = await ctx.call_async.merge_masks(
+            state_ids=tuple(stateids_segment),  # type: ignore
+            operation="union",
+        )
+        if isinstance(result_mask_union, ErrorResult):
+            raise ValueError(f"Eraser internal merge_masks error: {result_mask_union.error}")
+        stateid_mask_union = result_mask_union.state_id
     app.logger.debug(f"{stateid_mask_union=}")
 
-    # queue skills/erase
-    stateid_erased = await ctx.skill_erase(
-        stateid_image=stateid_input,
-        stateid_mask=stateid_mask_union,
-        mode="free",
+    # call erase skill
+    result_erase = await ctx.call_async.erase(
+        image_state_id=stateid_input,
+        mask_state_id=stateid_mask_union,
+        mode="express",
     )
-    app.logger.debug(f"{stateid_erased=}")
+    if isinstance(result_erase, ErrorResult):
+        raise ValueError(f"Eraser internal erase error: {result_erase.error}")
+    stateid_erase = result_erase.state_id
+    app.logger.debug(f"{stateid_erase=}")
 
-    return stateid_erased
+    return stateid_erase
 
 
-async def _eraser(ctx: EditorAPIContextCached, request: Request) -> Response:
+async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -71,23 +89,23 @@ async def _eraser(ctx: EditorAPIContextCached, request: Request) -> Response:
         stateids_input: list[StateID] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await ctx.create_state(oai_ref.download_link)
+                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        return json_error("stateids_input or openaiFileIdRefs is required", 400)
+        raise ValueError("Eraser input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate the inputs
     if input_data.object_names is None:
-        return json_error("object_names is required", 400)
+        raise ValueError("Eraser input error: object_names is required")
     if len(stateids_input) != len(input_data.object_names):
-        return json_error("stateids_input and object_names must have the same length", 400)
+        raise ValueError("Eraser input error: stateids_input and object_names must have the same length")
     for object_names in input_data.object_names:
         if not object_names:
-            return json_error("object list cannot be empty", 400)
+            raise ValueError("Eraser input error: object list cannot be empty")
         for object_name in object_names:
             if not object_name:
-                return json_error("object name cannot be empty", 400)
+                raise ValueError("Eraser input error: object name cannot be empty")
 
     # process the inputs
     stateids_erased = [
@@ -97,23 +115,20 @@ async def _eraser(ctx: EditorAPIContextCached, request: Request) -> Response:
     app.logger.debug(f"{stateids_erased=}")
 
     # download images from API
-    erased_imgs = [
-        await ctx.download_image(stateid_image=stateid_erased_img)  #
+    pil_outputs = [
+        await ctx.call_async.download_pil_image(stateid_erased_img)  #
         for stateid_erased_img in stateids_erased
     ]
 
     # build output response
-    output_data = EraseOutput(
+    data_output = EraseOutput(
         openaiFileResponse=[
-            OpenaiFileResponse.from_image(
-                image=erased_img,
-                name=f"erased_{i}",
-            )
-            for i, erased_img in enumerate(erased_imgs)
+            OpenaiFileResponse.from_image(image=erased_img, name=f"erased_{i}")
+            for i, erased_img in enumerate(pil_outputs)
         ],
         stateids_output=stateids_erased,
         stateids_undo=stateids_input,
     )
-    app.logger.debug(f"{output_data=}")
-    output_response = jsonify(output_data.model_dump())
+    app.logger.debug(f"{data_output=}")
+    output_response = jsonify(data_output.model_dump())
     return output_response

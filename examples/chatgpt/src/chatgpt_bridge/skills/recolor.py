@@ -1,9 +1,10 @@
+from finegrain import ErrorResult, StateID
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.context import EditorAPIContextCached
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
+from chatgpt_bridge.context import EditorAPIContext
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse
 
 
 class RecolorParams(BaseModel):
@@ -21,88 +22,118 @@ class RecolorOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContextCached,
+    ctx: EditorAPIContext,
     object_color: str,
-    stateid_input: str,
+    stateid_input: StateID,
     positive_object_names: list[str],
     negative_object_names: list[str],
-) -> str:
-    # queue skills/infer-bbox for positive objects
+) -> StateID:
+    # get bounding boxes for positive objects
     stateids_bbox_positive = []
     for name in positive_object_names:
-        stateid_bbox_positive = await ctx.skill_bbox(stateid_image=stateid_input, product_name=name)
-        app.logger.debug(f"{stateid_bbox_positive=}")
-        stateids_bbox_positive.append(stateid_bbox_positive)
+        result_bbox = await ctx.call_async.infer_bbox(
+            state_id=stateid_input,
+            product_name=name,
+        )
+        if isinstance(result_bbox, ErrorResult):
+            raise ValueError(f"Recolor internal positive infer_bbox error: {result_bbox.error}")
+        app.logger.debug(f"{result_bbox.bbox=}")
+        stateids_bbox_positive.append(result_bbox.bbox)
     app.logger.debug(f"{stateids_bbox_positive=}")
 
-    # queue skills/infer-bbox for negative objects
+    # get bounding boxes for negative objects
     stateids_bbox_negative = []
     for name in negative_object_names:
-        stateid_bbox_negative = await ctx.skill_bbox(stateid_image=stateid_input, product_name=name)
-        app.logger.debug(f"{stateid_bbox_negative=}")
-        stateids_bbox_negative.append(stateid_bbox_negative)
+        result_bbox = await ctx.call_async.infer_bbox(
+            state_id=stateid_input,
+            product_name=name,
+        )
+        if isinstance(result_bbox, ErrorResult):
+            raise ValueError(f"Recolor internal negative infer_bbox error: {result_bbox.error}")
+        app.logger.debug(f"{result_bbox.bbox=}")
+        stateids_bbox_negative.append(result_bbox.bbox)
     app.logger.debug(f"{stateids_bbox_negative=}")
 
-    # queue skills/segment for positive objects
+    # get segments for positive objects
     stateids_mask_positive = []
-    for stateid_bbox in stateids_bbox_positive:
-        stateid_mask_positive = await ctx.skill_segment(stateid_bbox=stateid_bbox)
-        app.logger.debug(f"{stateid_mask_positive=}")
-        stateids_mask_positive.append(stateid_mask_positive)
+    for bbox in stateids_bbox_positive:
+        result_segment = await ctx.call_async.segment(
+            state_id=stateid_input,
+            bbox=bbox,
+        )
+        if isinstance(result_segment, ErrorResult):
+            raise ValueError(f"Recolor internal positive segment error: {result_segment.error}")
+        stateids_mask_positive.append(result_segment.state_id)
     app.logger.debug(f"{stateids_mask_positive=}")
 
-    # queue skills/segment for negative objects
+    # get segments for negative objects
     stateids_mask_negative = []
-    for stateid_bbox in stateids_bbox_negative:
-        stateid_mask_negative = await ctx.skill_segment(stateid_bbox=stateid_bbox)
-        app.logger.debug(f"{stateid_mask_negative=}")
-        stateids_mask_negative.append(stateid_mask_negative)
+    for bbox in stateids_bbox_negative:
+        result_segment = await ctx.call_async.segment(
+            state_id=stateid_input,
+            bbox=bbox,
+        )
+        if isinstance(result_segment, ErrorResult):
+            raise ValueError(f"Recolor internal negative segment error: {result_segment.error}")
+        stateids_mask_negative.append(result_segment.state_id)
     app.logger.debug(f"{stateids_mask_negative=}")
 
-    # queue skills/merge-masks for positive objects
+    # merge positive masks
     if len(stateids_mask_positive) == 1:
         stateid_mask_positive_union = stateids_mask_positive[0]
     else:
-        stateid_mask_positive_union = await ctx.skill_merge_masks(
-            stateids=tuple(stateids_mask_positive),
+        result_mask_union = await ctx.call_async.merge_masks(
+            state_ids=tuple(stateids_mask_positive),  # type: ignore
             operation="union",
         )
+        if isinstance(result_mask_union, ErrorResult):
+            raise ValueError(f"Recolor internal positive merge_masks error: {result_mask_union.error}")
+        stateid_mask_positive_union = result_mask_union.state_id
     app.logger.debug(f"{stateid_mask_positive_union=}")
 
-    # queue skills/merge-masks for negative objects
+    # merge negative masks
     if len(stateids_mask_negative) == 0:
         stateid_mask_negative_union = None
     elif len(stateids_mask_negative) == 1:
         stateid_mask_negative_union = stateids_mask_negative[0]
     else:
-        stateid_mask_negative_union = await ctx.skill_merge_masks(
-            stateids=tuple(stateids_mask_negative),
+        result_mask_union = await ctx.call_async.merge_masks(
+            state_ids=tuple(stateids_mask_negative),  # type: ignore
             operation="union",
         )
+        if isinstance(result_mask_union, ErrorResult):
+            raise ValueError(f"Recolor internal negative merge_masks error: {result_mask_union.error}")
+        stateid_mask_negative_union = result_mask_union.state_id
     app.logger.debug(f"{stateid_mask_negative_union=}")
 
-    # queue skills/merge-masks for difference between positive and negative masks
+    # get difference between positive and negative masks
     if stateid_mask_negative_union is not None:
-        stateid_mask_difference = await ctx.skill_merge_masks(
-            stateids=(stateid_mask_positive_union, stateid_mask_negative_union),
+        result_mask_difference = await ctx.call_async.merge_masks(
+            state_ids=(stateid_mask_positive_union, stateid_mask_negative_union),  # type: ignore
             operation="difference",
         )
+        if isinstance(result_mask_difference, ErrorResult):
+            raise ValueError(f"Recolor internal merge_masks error: {result_mask_difference.error}")
+        stateid_mask_difference = result_mask_difference.state_id
     else:
         stateid_mask_difference = stateid_mask_positive_union
     app.logger.debug(f"{stateid_mask_difference=}")
 
-    # queue skills/recolor
-    stateid_recolor = await ctx.skill_recolor(
-        stateid_image=stateid_input,
-        stateid_mask=stateid_mask_difference,
+    # recolor the image
+    result_recolor = await ctx.call_async.recolor(
+        image_state_id=stateid_input,
+        mask_state_id=stateid_mask_difference,
         color=object_color,
     )
+    if isinstance(result_recolor, ErrorResult):
+        raise ValueError(f"Recolor internal recolor error: {result_recolor.error}")
+    stateid_recolor = result_recolor.state_id
     app.logger.debug(f"{stateid_recolor=}")
 
     return stateid_recolor
 
 
-async def _recolor(ctx: EditorAPIContextCached, request: Request) -> Response:
+async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -113,42 +144,42 @@ async def _recolor(ctx: EditorAPIContextCached, request: Request) -> Response:
     if input_data.stateids_input:
         stateids_input = input_data.stateids_input
     elif input_data.openaiFileIdRefs:
-        stateids_input: list[str] = []
+        stateids_input: list[StateID] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await ctx.create_state(oai_ref.download_link)
+                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        return json_error("stateids_input or openaiFileIdRefs is required", 400)
+        raise ValueError("Recolor input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate object_colors
     if input_data.object_colors is None:
-        return json_error("object_colors is required", 400)
+        raise ValueError("Recolor input error: object_colors is required")
     if len(stateids_input) != len(input_data.object_colors):
-        return json_error("stateids_input and object_colors must have the same length", 400)
+        raise ValueError("Recolor input error: stateids_input and object_colors must have the same length")
 
     # validate positive_object_names
     if input_data.positive_object_names is None:
-        return json_error("positive_object_names is required", 400)
+        raise ValueError("Recolor input error: positive_object_names is required")
     if len(stateids_input) != len(input_data.positive_object_names):
-        return json_error("stateids_input and positive_object_names must have the same length", 400)
+        raise ValueError("Recolor input error: stateids_input and positive_object_names must have the same length")
     for object_names in input_data.positive_object_names:
         if not object_names:
-            return json_error("positive object list cannot be empty", 400)
+            raise ValueError("Recolor input error: positive object list cannot be empty")
         for object_name in object_names:
             if not object_name:
-                return json_error("positive object name cannot be empty", 400)
+                raise ValueError("Recolor input error: positive object name cannot be empty")
 
     # validate negative_object_names
     if input_data.negative_object_names is None:
         input_data.negative_object_names = [[]] * len(stateids_input)
     if len(stateids_input) != len(input_data.negative_object_names):
-        return json_error("stateids_input and negative_object_names must have the same length", 400)
+        raise ValueError("Recolor input error: stateids_input and negative_object_names must have the same length")
     for object_names in input_data.negative_object_names:
         for object_name in object_names:
             if not object_name:
-                return json_error("negative object name cannot be empty", 400)
+                raise ValueError("Recolor input error: negative object name cannot be empty")
 
     # process the inputs
     stateids_recolor = [
@@ -169,9 +200,9 @@ async def _recolor(ctx: EditorAPIContextCached, request: Request) -> Response:
     ]
     app.logger.debug(f"{stateids_recolor=}")
 
-    # download the output images
+    # download output images
     recolor_imgs = [
-        await ctx.download_image(stateid_image=stateid_recolor)  #
+        await ctx.call_async.download_pil_image(stateid_recolor)  #
         for stateid_recolor in stateids_recolor
     ]
 

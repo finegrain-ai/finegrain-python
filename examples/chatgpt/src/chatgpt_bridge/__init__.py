@@ -3,7 +3,7 @@ from typing import Any
 
 from quart import Quart, Response, jsonify, request
 
-from chatgpt_bridge.context import EditorAPIContextCached
+from chatgpt_bridge.context import EditorAPIContext
 from chatgpt_bridge.env import (
     APP_LOGLEVEL,
     CHATGPT_AUTH_TOKEN,
@@ -20,10 +20,9 @@ from chatgpt_bridge.skills.erase import _eraser
 from chatgpt_bridge.skills.recolor import _recolor
 from chatgpt_bridge.skills.shadow import _shadow
 from chatgpt_bridge.skills.undo import _undo
-from chatgpt_bridge.skills.upscale import _upscale
 from chatgpt_bridge.utils import json_error, require_basic_auth_token
 
-ctx = EditorAPIContextCached(
+ctx = EditorAPIContext(
     base_url=FG_API_URL,
     user=FG_API_USER,
     password=FG_API_PASSWORD,
@@ -68,15 +67,10 @@ async def handle_runtime_error(error: RuntimeError) -> Response:
     return json_error(str(error))
 
 
-@app.route("/health")
-async def health() -> Response:
-    return jsonify({"status": "healthy"})
-
-
-@app.post("/upscale")
-@require_basic_auth_token(CHATGPT_AUTH_TOKEN)
-async def upscale() -> Any:
-    return await _upscale(ctx, request)
+@app.errorhandler(ValueError)
+async def handle_value_error(error: ValueError) -> Response:
+    app.logger.error(f"{error=}")
+    return json_error(str(error))
 
 
 @app.post("/box")

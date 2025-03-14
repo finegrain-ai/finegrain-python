@@ -3,7 +3,6 @@ authors = [
     { name = "Laurent Fainsin", email = "laurent@lagon.tech" },
 ]
 dependencies = [
-    "async-lru>=2.0.4",
     "environs>=14.1.0",
     "finegrain @ git+https://github.com/finegrain-ai/finegrain-python.git#subdirectory=finegrain",
     "pillow>=11.1.0",

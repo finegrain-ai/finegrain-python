@@ -1,9 +1,10 @@
+from finegrain import BoundingBox, ErrorResult, StateID
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.context import EditorAPIContextCached
-from chatgpt_bridge.utils import BoundingBox, OpenaiFileIdRef, StateID, json_error
+from chatgpt_bridge.context import EditorAPIContext
+from chatgpt_bridge.utils import OpenaiFileIdRef
 
 
 class BoxParams(BaseModel):
@@ -17,22 +18,24 @@ class BoxOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContextCached,
+    ctx: EditorAPIContext,
     stateid_input: StateID,
     object_name: str,
 ) -> BoundingBox:
-    # queue skills/infer-bbox
-    stateid_bbox = await ctx.skill_bbox(stateid_image=stateid_input, product_name=object_name)
-    app.logger.debug(f"{stateid_bbox=}")
+    # call infer-bbox
+    result_bbox = await ctx.call_async.infer_bbox(
+        state_id=stateid_input,
+        product_name=object_name,
+    )
+    if isinstance(result_bbox, ErrorResult):
+        raise ValueError(f"Box internal infer_bbox error: {result_bbox.error}")
+    bbox = result_bbox.bbox
+    app.logger.debug(f"{bbox=}")
 
-    # get bbox state/meta
-    metadata_bbox = await ctx.get_meta(stateid_bbox)
-    bounding_box = metadata_bbox["bbox"]
-
-    return bounding_box
+    return bbox
 
 
-async def _box(ctx: EditorAPIContextCached, request: Request) -> Response:
+async def _box(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -46,22 +49,22 @@ async def _box(ctx: EditorAPIContextCached, request: Request) -> Response:
         stateids_input: list[StateID] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await ctx.create_state(oai_ref.download_link)
+                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        return json_error("stateids_input or openaiFileIdRefs is required", 400)
+        raise ValueError("Box input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate object_names
     if input_data.object_names is None:
-        return json_error("object_names is required", 400)
+        raise ValueError("Box input error: object_names is required")
     if not input_data.object_names:
-        return json_error("object_names cannot be empty", 400)
+        raise ValueError("Box input error: object_names cannot be empty")
     for object_name in input_data.object_names:
         if not object_name:
-            return json_error("object name cannot be empty", 400)
+            raise ValueError("Box input error: object name cannot be empty")
     if len(input_data.object_names) != len(stateids_input):
-        return json_error("stateids_input and object_names must have the same length", 400)
+        raise ValueError("Box input error: stateids_input and object_names must have the same length")
 
     # process the inputs
     bounding_boxes = [

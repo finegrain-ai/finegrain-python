@@ -1,12 +1,11 @@
-import io
-
+from finegrain import ErrorResult, StateID
 from PIL import Image
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.context import EditorAPIContextCached
-from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, StateID, json_error
+from chatgpt_bridge.context import EditorAPIContext
+from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse, image_to_bytes
 
 
 class CutoutParams(BaseModel):
@@ -23,24 +22,43 @@ class CutoutOutput(BaseModel):
 
 
 async def process(
-    ctx: EditorAPIContextCached,
+    ctx: EditorAPIContext,
     stateid_input: StateID,
     background_color: str,
     object_name: str,
 ) -> tuple[Image.Image, StateID]:
-    # queue skills/infer-bbox
-    stateid_bbox = await ctx.skill_bbox(stateid_image=stateid_input, product_name=object_name)
-    app.logger.debug(f"{stateid_bbox=}")
+    # call infer-bbox
+    result_bbox = await ctx.call_async.infer_bbox(
+        state_id=stateid_input,
+        product_name=object_name,
+    )
+    if isinstance(result_bbox, ErrorResult):
+        raise ValueError(f"Cutout internal infer_bbox error: {result_bbox.error}")
+    bbox = result_bbox.bbox
+    app.logger.debug(f"{bbox=}")
 
-    # queue skills/segment
-    stateid_mask = await ctx.skill_segment(stateid_bbox=stateid_bbox)
-    app.logger.debug(f"{stateid_mask=}")
+    # call segment
+    result_segment = await ctx.call_async.segment(
+        state_id=stateid_input,
+        bbox=bbox,
+    )
+    if isinstance(result_segment, ErrorResult):
+        raise ValueError(f"Cutout internal segment error: {result_segment.error}")
+    stateid_segment = result_segment.state_id
+    app.logger.debug(f"{stateid_segment=}")
 
-    # queue skills/cutout
-    stateid_cutout = await ctx.skill_cutout(stateid_image=stateid_input, stateid_mask=stateid_mask)
+    # call cutout
+    result_cutout = await ctx.call_async.cutout(
+        image_state_id=stateid_input,
+        mask_state_id=stateid_segment,
+    )
+    if isinstance(result_cutout, ErrorResult):
+        raise ValueError(f"Cutout internal cutout error: {result_cutout.error}")
+    stateid_cutout = result_cutout.state_id
     app.logger.debug(f"{stateid_cutout=}")
 
-    cutout = await ctx.download_image(stateid_image=stateid_cutout)
+    # download cutout
+    cutout = await ctx.call_async.download_pil_image(stateid_cutout)
 
     # paste cutout onto a blank image, with margins
     cutout_margin = Image.new(
@@ -58,15 +76,14 @@ async def process(
     cutout_margin = cutout_margin.convert("RGB")
 
     # upload the cutout with margin to the API
-    cutout_margin_data = io.BytesIO()
-    cutout_margin.save(cutout_margin_data, format="JPEG")
-    stateid_cutout_margin = await ctx.create_state(file=cutout_margin_data)
+    cutout_data = image_to_bytes(cutout_margin)
+    stateid_cutout_margin = await ctx.call_async.upload_image(cutout_data)
     app.logger.debug(f"{stateid_cutout_margin=}")
 
     return cutout_margin, stateid_cutout_margin
 
 
-async def _cutout(ctx: EditorAPIContextCached, request: Request) -> Response:
+async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -77,27 +94,27 @@ async def _cutout(ctx: EditorAPIContextCached, request: Request) -> Response:
     if input_data.stateids_input:
         stateids_input = input_data.stateids_input
     elif input_data.openaiFileIdRefs:
-        stateids_input: list[str] = []
+        stateids_input: list[StateID] = []
         for oai_ref in input_data.openaiFileIdRefs:
             if oai_ref.download_link:
-                stateid_input = await ctx.create_state(oai_ref.download_link)
+                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        return json_error("stateids_input or openaiFileIdRefs is required", 400)
+        raise ValueError("Cutout input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate input data
     if input_data.object_names is None:
-        return json_error("object_names is required", 400)
+        raise ValueError("Cutout input error: object_names is required")
     if len(stateids_input) != len(input_data.object_names):
-        return json_error("stateids_input and object_names must have the same length", 400)
+        raise ValueError("Cutout input error: stateids_input and object_names must have the same length")
     for object_name in input_data.object_names:
         if not object_name:
-            return json_error("object name cannot be empty", 400)
+            raise ValueError("Cutout input error: object name cannot be empty")
     if input_data.background_colors is None:
         input_data.background_colors = ["#ffffff"] * len(stateids_input)
     if len(input_data.background_colors) != len(stateids_input):
-        return json_error("stateids_input and background_colors must have the same length", 400)
+        raise ValueError("Cutout input error: stateids_input and background_colors must have the same length")
 
     # process the inputs
     outputs = [

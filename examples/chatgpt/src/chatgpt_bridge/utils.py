@@ -31,6 +31,13 @@ def require_basic_auth_token(token: str):
     return decorator
 
 
+def image_to_bytes(image: Image.Image) -> io.BytesIO:
+    data = io.BytesIO()
+    image.save(data, format="PNG", optimize=True)
+    data.seek(0)
+    return data
+
+
 def image_to_base64(
     image: Image.Image,
     image_format: str,
@@ -64,6 +71,3 @@ class OpenaiFileResponse(BaseModel):
 
     def __repr__(self) -> str:
         return f"OpenaiFileResponse(name={self.name}, mime_type={self.mime_type}, content_len={len(self.content)})"
-
-
-BoundingBox = tuple[int, int, int, int]  # (x1, y1, x2, y2)

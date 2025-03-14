@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
-from chatgpt_bridge.context import EditorAPIContextCached
-from chatgpt_bridge.utils import OpenaiFileResponse, StateID, json_error
+from chatgpt_bridge.context import EditorAPIContext
+from chatgpt_bridge.utils import OpenaiFileResponse, StateID
 
 
 class UndoParams(BaseModel):
@@ -15,7 +15,7 @@ class UndoOutput(BaseModel):
     stateids_output: list[StateID]
 
 
-async def _undo(ctx: EditorAPIContextCached, request: Request) -> Response:
+async def _undo(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -24,11 +24,11 @@ async def _undo(ctx: EditorAPIContextCached, request: Request) -> Response:
 
     # validate input data
     if not input_data.stateids_undo:
-        return json_error("stateids_undo is required", 400)
+        raise ValueError("Undo input error: stateids_undo is required")
 
     # download the image
     images = [
-        await ctx.download_image(stateid_image=stateid)  #
+        await ctx.call_async.download_pil_image(stateid)  #
         for stateid in input_data.stateids_undo
     ]
 
