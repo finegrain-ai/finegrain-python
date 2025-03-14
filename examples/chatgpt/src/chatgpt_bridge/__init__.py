@@ -22,7 +22,7 @@ from chatgpt_bridge.skills.shadow import _shadow
 from chatgpt_bridge.skills.undo import _undo
 from chatgpt_bridge.utils import json_error, require_basic_auth_token
 
-__version__ = version("etat")
+__version__ = version("chatgpt_bridge")
 
 ctx = EditorAPIContext(
     base_url=FG_API_URL,
