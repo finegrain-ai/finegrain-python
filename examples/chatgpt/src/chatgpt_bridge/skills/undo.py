@@ -1,9 +1,10 @@
+from finegrain import StateID
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
 
 from chatgpt_bridge.context import EditorAPIContext
-from chatgpt_bridge.utils import OpenaiFileResponse, StateID
+from chatgpt_bridge.utils import OpenaiFileResponse
 
 
 class UndoParams(BaseModel):
@@ -35,10 +36,7 @@ async def _undo(ctx: EditorAPIContext, request: Request) -> Response:
     # build output response
     output_data = UndoOutput(
         openaiFileResponse=[
-            OpenaiFileResponse.from_image(
-                image=image,
-                name=f"undo_{i}",
-            )
+            OpenaiFileResponse.from_image(image=image, name=f"undo_{i}")  #
             for i, image in enumerate(images)
         ],
         stateids_output=input_data.stateids_undo,

@@ -1,7 +1,8 @@
 import logging
+from importlib.metadata import version
 from typing import Any
 
-from quart import Quart, Response, jsonify, request
+from quart import Quart, Response, request
 
 from chatgpt_bridge.context import EditorAPIContext
 from chatgpt_bridge.env import (
@@ -14,7 +15,6 @@ from chatgpt_bridge.env import (
     FG_API_USER,
     LOGLEVEL,
 )
-from chatgpt_bridge.skills.box import _box
 from chatgpt_bridge.skills.cutout import _cutout
 from chatgpt_bridge.skills.erase import _eraser
 from chatgpt_bridge.skills.recolor import _recolor
@@ -22,12 +22,15 @@ from chatgpt_bridge.skills.shadow import _shadow
 from chatgpt_bridge.skills.undo import _undo
 from chatgpt_bridge.utils import json_error, require_basic_auth_token
 
+__version__ = version("etat")
+
 ctx = EditorAPIContext(
     base_url=FG_API_URL,
     user=FG_API_USER,
     password=FG_API_PASSWORD,
     priority=FG_API_PRIORITY,
     default_timeout=FG_API_TIMEOUT,
+    user_agent=f"chatgpt-bridge/{__version__}",
 )
 
 app = Quart(__name__)
