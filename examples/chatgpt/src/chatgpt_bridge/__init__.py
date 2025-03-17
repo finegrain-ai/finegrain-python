@@ -24,13 +24,15 @@ from chatgpt_bridge.utils import json_error, require_basic_auth_token
 
 __version__ = version("chatgpt_bridge")
 
+USER_AGENT = f"chatgpt-bridge/{__version__}"
+
 ctx = EditorAPIContext(
     base_url=FG_API_URL,
     user=FG_API_USER,
     password=FG_API_PASSWORD,
     priority=FG_API_PRIORITY,
     default_timeout=FG_API_TIMEOUT,
-    user_agent=f"chatgpt-bridge/{__version__}",
+    user_agent=USER_AGENT,
 )
 
 app = Quart(__name__)
@@ -42,11 +44,13 @@ app.logger.info(f"{FG_API_URL=}")
 app.logger.info(f"{FG_API_USER=}")
 app.logger.info(f"{FG_API_TIMEOUT=}")
 app.logger.info(f"{FG_API_PRIORITY=}")
+app.logger.info(f"{USER_AGENT=}")
 
 
 @app.before_serving
 async def login() -> None:
     await ctx.login()
+    app.logger.info(f"Successully logged into the Finegrain API, credits remaining: {ctx.credits}")
 
 
 @app.before_serving
