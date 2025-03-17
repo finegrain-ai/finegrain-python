@@ -34,10 +34,10 @@ async def process(
         prompt=positive_prompt,
     )
     if isinstance(result_positive_detect, ErrorResult):
-        raise ValueError(f"Erase internal positive detect error: {result_positive_detect.error}")
+        raise ValueError(f"Recolor internal positive detect error: {result_positive_detect.error}")
     positive_detections = result_positive_detect.results
     if len(positive_detections) == 0:
-        raise ValueError(f"Erase internal positive detect error: not detection found for prompt {positive_prompt}")
+        raise ValueError(f"Recolor internal positive detect error: not detection found for prompt {positive_prompt}")
     app.logger.debug(f"{positive_detections=}")
 
     # call detect for negative objects
@@ -48,7 +48,7 @@ async def process(
             prompt=negative_prompt,
         )
         if isinstance(result_negative_detect, ErrorResult):
-            raise ValueError(f"Erase internal negative detect error: {result_negative_detect.error}")
+            raise ValueError(f"Recolor internal negative detect error: {result_negative_detect.error}")
         negative_detections = result_negative_detect.results
     app.logger.debug(f"{negative_detections=}")
 
@@ -160,11 +160,11 @@ async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
 
     # validate positive_prompts
     if input_data.positive_prompts is None:
-        raise ValueError("Eraser input error: positive_prompts is required")
+        raise ValueError("Recolor input error: positive_prompts is required")
     if len(stateids_input) != len(input_data.positive_prompts):
         raise ValueError("Recolor input error: stateids_input and positive_prompts must have the same length")
     if any(not prompt for prompt in input_data.positive_prompts):
-        raise ValueError("Eraser input error: all the positive prompts must be not empty")
+        raise ValueError("Recolor input error: all the positive prompts must be not empty")
 
     # validate negative_object_names
     if input_data.negative_prompts is None:

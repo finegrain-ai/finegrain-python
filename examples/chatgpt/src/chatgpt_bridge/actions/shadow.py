@@ -32,7 +32,7 @@ async def process(
         prompt=prompt,
     )
     if isinstance(result_detect, ErrorResult):
-        raise ValueError(f"Erase internal detect error: {result_detect.error}")
+        raise ValueError(f"Shadow internal detect error: {result_detect.error}")
     detections = result_detect.results
     app.logger.debug(f"{detections=}")
 
@@ -44,7 +44,7 @@ async def process(
             bbox=detection.bbox,
         )
         if isinstance(result_segment, ErrorResult):
-            raise ValueError(f"Erase internal segment error: {result_segment.error}")
+            raise ValueError(f"Shadow internal segment error: {result_segment.error}")
         stateids_segment.append(result_segment.state_id)
     app.logger.debug(f"{stateids_segment=}")
 
@@ -57,7 +57,7 @@ async def process(
             operation="union",
         )
         if isinstance(result_mask_union, ErrorResult):
-            raise ValueError(f"Eraser internal merge_masks error: {result_mask_union.error}")
+            raise ValueError(f"Shadow internal merge_masks error: {result_mask_union.error}")
         stateid_mask_union = result_mask_union.state_id
     app.logger.debug(f"{stateid_mask_union=}")
 
@@ -116,9 +116,9 @@ async def _shadow(ctx: EditorAPIContext, request: Request) -> Response:
 
     # validate prompts
     if input_data.prompts is None:
-        raise ValueError("Eraser input error: prompts is required")
+        raise ValueError("Shadow input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("Eraser input error: all the prompts must be not empty")
+        raise ValueError("Shadow input error: all the prompts must be not empty")
 
     # validate background_colors
     if input_data.background_colors is None:
@@ -126,7 +126,7 @@ async def _shadow(ctx: EditorAPIContext, request: Request) -> Response:
     if len(stateids_input) != len(input_data.background_colors):
         raise ValueError("Shadow input error: stateids_input and background_colors must have the same length")
     if any(not color for color in input_data.background_colors):
-        raise ValueError("Eraser input error: all the background colors must be not empty")
+        raise ValueError("Shadow input error: all the background colors must be not empty")
 
     # process the inputs
     stateids_shadow = [

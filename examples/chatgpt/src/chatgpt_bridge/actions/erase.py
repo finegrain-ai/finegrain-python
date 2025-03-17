@@ -55,7 +55,7 @@ async def process(
             operation="union",
         )
         if isinstance(result_mask_union, ErrorResult):
-            raise ValueError(f"Eraser internal merge_masks error: {result_mask_union.error}")
+            raise ValueError(f"Erase internal merge_masks error: {result_mask_union.error}")
         stateid_mask_union = result_mask_union.state_id
     app.logger.debug(f"{stateid_mask_union=}")
 
@@ -66,7 +66,7 @@ async def process(
         mode="express",
     )
     if isinstance(result_erase, ErrorResult):
-        raise ValueError(f"Eraser internal erase error: {result_erase.error}")
+        raise ValueError(f"Erase internal erase error: {result_erase.error}")
     stateid_erase = result_erase.state_id
     app.logger.debug(f"{stateid_erase=}")
 
@@ -90,16 +90,16 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("Eraser input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("Erase input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate the inputs
     if input_data.prompts is None:
-        raise ValueError("Eraser input error: prompts is required")
+        raise ValueError("Erase input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("Eraser input error: all the prompts must be not empty")
+        raise ValueError("Erase input error: all the prompts must be not empty")
     if len(stateids_input) != len(input_data.prompts):
-        raise ValueError("Eraser input error: stateids_input and prompts must have the same length")
+        raise ValueError("Erase input error: stateids_input and prompts must have the same length")
 
     # process the inputs
     stateids_erased = [
