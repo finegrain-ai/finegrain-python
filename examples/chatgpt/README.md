@@ -10,19 +10,19 @@ Create `.env` from the `.env.example` file.
 
 1. Install the dependencies:
 ```bash
-rye sync --all-features --no-lock
+uv sync --all-extras --all-groups
 ```
 
 2. Start the development server:
 ```bash
-QUART_APP=chatgpt_bridge quart run
+QUART_APP=chatgpt_bridge uv run quart
 ```
 
 ### Deployment
 
 1. Install the dependencies:
 ```bash
-rye sync --no-dev --no-lock
+uv sync --all-extras --all-groups --locked
 ```
 
 2. Start the production server:
