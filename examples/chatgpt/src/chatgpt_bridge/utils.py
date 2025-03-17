@@ -23,7 +23,7 @@ def require_basic_auth_token(token: str):
         async def decorated_function(*args, **kwargs):
             auth_header = request.headers.get("Authorization", "")
             if auth_header != f"Basic {token}":
-                return json_error("Unauthorized", 401)
+                return json_error("Unauthorized, wrong basic auth token", 401)
             return await f(*args, **kwargs)
 
         return decorated_function
