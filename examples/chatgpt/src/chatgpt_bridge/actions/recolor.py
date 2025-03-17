@@ -37,7 +37,7 @@ async def process(
         raise ValueError(f"Recolor internal positive detect error: {result_positive_detect.error}")
     positive_detections = result_positive_detect.results
     if len(positive_detections) == 0:
-        raise ValueError(f"Recolor internal positive detect error: not detection found for prompt {positive_prompt}")
+        raise ValueError(f"Recolor internal positive detect error: no detection found for prompt {positive_prompt}")
     app.logger.debug(f"{positive_detections=}")
 
     # call detect for negative objects
