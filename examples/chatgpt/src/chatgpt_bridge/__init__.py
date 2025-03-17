@@ -4,6 +4,11 @@ from typing import Any
 
 from quart import Quart, Response, request
 
+from chatgpt_bridge.actions.cutout import _cutout
+from chatgpt_bridge.actions.erase import _eraser
+from chatgpt_bridge.actions.recolor import _recolor
+from chatgpt_bridge.actions.shadow import _shadow
+from chatgpt_bridge.actions.undo import _undo
 from chatgpt_bridge.context import EditorAPIContext
 from chatgpt_bridge.env import (
     APP_LOGLEVEL,
@@ -15,11 +20,6 @@ from chatgpt_bridge.env import (
     FG_API_USER,
     LOGLEVEL,
 )
-from chatgpt_bridge.skills.cutout import _cutout
-from chatgpt_bridge.skills.erase import _eraser
-from chatgpt_bridge.skills.recolor import _recolor
-from chatgpt_bridge.skills.shadow import _shadow
-from chatgpt_bridge.skills.undo import _undo
 from chatgpt_bridge.utils import json_error, require_basic_auth_token
 
 __version__ = version("chatgpt_bridge")
