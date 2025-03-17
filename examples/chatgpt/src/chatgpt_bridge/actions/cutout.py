@@ -12,7 +12,7 @@ class CutoutParams(BaseModel):
     openaiFileIdRefs: list[OpenaiFileIdRef] | None = None  # noqa: N815
     stateids_input: list[StateID] | None = None
     background_colors: list[str] | None = None
-    object_names: list[str] | None = None
+    prompts: list[str] | None = None
 
 
 class CutoutOutput(BaseModel):
@@ -25,32 +25,47 @@ async def process(
     ctx: EditorAPIContext,
     stateid_input: StateID,
     background_color: str,
-    object_name: str,
+    prompt: str,
 ) -> tuple[Image.Image, StateID]:
-    # call infer-bbox
-    result_bbox = await ctx.call_async.infer_bbox(
+    # call detect
+    result_detect = await ctx.call_async.detect(
         state_id=stateid_input,
-        product_name=object_name,
+        prompt=prompt,
     )
-    if isinstance(result_bbox, ErrorResult):
-        raise ValueError(f"Cutout internal infer_bbox error: {result_bbox.error}")
-    bbox = result_bbox.bbox
-    app.logger.debug(f"{bbox=}")
+    if isinstance(result_detect, ErrorResult):
+        raise ValueError(f"Erase internal detect error: {result_detect.error}")
+    detections = result_detect.results
+    app.logger.debug(f"{detections=}")
 
-    # call segment
-    result_segment = await ctx.call_async.segment(
-        state_id=stateid_input,
-        bbox=bbox,
-    )
-    if isinstance(result_segment, ErrorResult):
-        raise ValueError(f"Cutout internal segment error: {result_segment.error}")
-    stateid_segment = result_segment.state_id
-    app.logger.debug(f"{stateid_segment=}")
+    # call segment on each detection
+    stateids_segment = []
+    for detection in detections:
+        result_segment = await ctx.call_async.segment(
+            state_id=stateid_input,
+            bbox=detection.bbox,
+        )
+        if isinstance(result_segment, ErrorResult):
+            raise ValueError(f"Erase internal segment error: {result_segment.error}")
+        stateids_segment.append(result_segment.state_id)
+    app.logger.debug(f"{stateids_segment=}")
+
+    # call merge-masks
+    if len(stateids_segment) == 1:
+        stateid_mask_union = stateids_segment[0]
+    else:
+        result_mask_union = await ctx.call_async.merge_masks(
+            state_ids=tuple(stateids_segment),  # type: ignore
+            operation="union",
+        )
+        if isinstance(result_mask_union, ErrorResult):
+            raise ValueError(f"Eraser internal merge_masks error: {result_mask_union.error}")
+        stateid_mask_union = result_mask_union.state_id
+    app.logger.debug(f"{stateid_mask_union=}")
 
     # call cutout
     result_cutout = await ctx.call_async.cutout(
         image_state_id=stateid_input,
-        mask_state_id=stateid_segment,
+        mask_state_id=stateid_mask_union,
     )
     if isinstance(result_cutout, ErrorResult):
         raise ValueError(f"Cutout internal cutout error: {result_cutout.error}")
@@ -104,13 +119,12 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
     app.logger.debug(f"{stateids_input=}")
 
     # validate input data
-    if input_data.object_names is None:
-        raise ValueError("Cutout input error: object_names is required")
-    if len(stateids_input) != len(input_data.object_names):
-        raise ValueError("Cutout input error: stateids_input and object_names must have the same length")
-    for object_name in input_data.object_names:
-        if not object_name:
-            raise ValueError("Cutout input error: object name cannot be empty")
+    if input_data.prompts is None:
+        raise ValueError("Eraser input error: prompts is required")
+    if any(not prompt for prompt in input_data.prompts):
+        raise ValueError("Eraser input error: all the prompts must be not empty")
+    if len(stateids_input) != len(input_data.prompts):
+        raise ValueError("Cutout input error: stateids_input and prompts must have the same length")
     if input_data.background_colors is None:
         input_data.background_colors = ["#ffffff"] * len(stateids_input)
     if len(input_data.background_colors) != len(stateids_input):
@@ -120,13 +134,13 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
     outputs = [
         await process(
             ctx=ctx,
-            object_name=object_name,
+            prompt=prompt,
             stateid_input=stateid_input,
             background_color=background_color,
         )
-        for stateid_input, object_name, background_color in zip(
+        for stateid_input, prompt, background_color in zip(
             stateids_input,
-            input_data.object_names,
+            input_data.prompts,
             input_data.background_colors,
             strict=True,
         )
