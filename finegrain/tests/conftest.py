@@ -50,3 +50,9 @@ def output_dir() -> str | None:
 def coffee_plant_bytes() -> bytes:
     with open(PARENT_PATH / "fixtures" / "coffee-plant.jpg", "rb") as f:
         return f.read()
+
+
+@pytest.fixture(scope="function")
+def sofa_cushion_bytes() -> bytes:
+    with open(PARENT_PATH / "fixtures" / "sofa-cushion.jpg", "rb") as f:
+        return f.read()
