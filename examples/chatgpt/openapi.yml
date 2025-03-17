@@ -1,0 +1,367 @@
+openapi: 3.1.0
+info:
+  title: Finegrain API
+  description: Set of endpoints to interact with the Finegrain API, allowing users to perform various image editing tasks
+    using an LLM agent.
+  version: 1.0.0
+servers:
+  - url: https://your.server/
+    description: Finegrain API ChatGPT Bridge
+paths:
+  /cutout:
+    post:
+      operationId: cutout
+      x-openai-isConsequential: false
+      summary: Cutout objects from images based on a text prompt
+      description: The user uploads images or references some stateids, and text prompts describing the objects to be cutout
+        in each image. The agent associates images and object names. The API returns the cutouts, stateids referencing
+        the cutouts and stateids referencing the input images.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names,
+                background_colors and stateids_input (or openaiFileIdRefs) must have the same length.
+              properties:
+                user_message:
+                  type: string
+                  description: The (verbatim) last message sent by the user, that triggered this action
+                object_names:
+                  type: array
+                  description: List of objects to cutout in each image
+                  items:
+                    type: string
+                background_colors:
+                  type: array
+                  description: List of hex colors (#rrggbb) to fill the background of each image with
+                  items:
+                    type: string
+                    default: "#ffffff"
+                openaiFileIdRefs:
+                  type: array
+                  description: List of images to process, uploaded by the user
+                  items:
+                    type: string
+                stateids_input:
+                  type: array
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Objects cutout successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openaiFileResponse:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          description: The filename of the image
+                        mime_type:
+                          type: string
+                          description: The MIME type of the image
+                        content:
+                          type: string
+                          format: byte
+                          description: The base64 encoded cutout image content
+                  stateids_output:
+                    type: array
+                    description: The state ids of the cutout images, useful to chain edits
+                    items:
+                      type: string
+                  stateids_undo:
+                    type: array
+                    description: The state ids of the input images, useful to undo edits
+                    items:
+                      type: string
+  /erase:
+    post:
+      operationId: erase
+      x-openai-isConsequential: false
+      summary: Erase objects from images based on a text prompt
+      description: The user uploads images or references stateids, and text prompts describing the objects to be erased in
+        each image. The agent associates images and object names. The API returns the altered images, stateids
+        referencing the altered images and stateids referencing the input images.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names
+                and stateids_input (or openaiFileIdRefs) must have the same length.
+              properties:
+                user_message:
+                  type: string
+                  description: The (verbatim) last message sent by the user, that triggered this action
+                object_names:
+                  type: array
+                  description: List of list of objects to erase in each image
+                  items:
+                    type: array
+                    description: List of objects to erase in the associated image
+                    items:
+                      type: string
+                openaiFileIdRefs:
+                  type: array
+                  description: List of images to process, uploaded by the user
+                  items:
+                    type: string
+                stateids_input:
+                  type: array
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Object erased successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openaiFileResponse:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          description: The filename of the image
+                        mime_type:
+                          type: string
+                          description: The MIME type of the image
+                        content:
+                          type: string
+                          format: byte
+                          description: The base64 encoded altered image content
+                  stateids_output:
+                    type: array
+                    description: The state ids of the altered images, useful to chain edits
+                    items:
+                      type: string
+                  stateids_undo:
+                    type: array
+                    description: The state ids of the input images, useful to undo edits
+                    items:
+                      type: string
+  /recolor:
+    post:
+      operationId: recolor
+      x-openai-isConsequential: false
+      summary: Recolors an object in an image based on a text prompt
+      description: The user uploads images or references some stateids, and text prompts describing the objects to recolor in
+        each image. The agent associates images and object names. The API returns the recolored images, stateids
+        referencing the recolored images and stateids referencing the input images.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
+                positive_object_names, negative_object_names, object_colors and stateids_input (or openaiFileIdRefs)
+                must have the same length.
+              properties:
+                user_message:
+                  type: string
+                  description: The (verbatim) last message sent by the user, that triggered this action
+                positive_object_names:
+                  type: array
+                  description: List of objects to recolor in each image
+                  items:
+                    type: array
+                    description: List of objects to recolor in the associated image
+                    items:
+                      type: string
+                negative_object_names:
+                  type: array
+                  description: List of list of objects to not recolor in each image, leave empty if not explicitly referenced
+                  items:
+                    type: array
+                    description: List of objects to not recolor in the associated image
+                    items:
+                      type: string
+                object_colors:
+                  type: array
+                  description: List of hex colors (#rrggbb) to recolor the positive objects to
+                  items:
+                    type: string
+                openaiFileIdRefs:
+                  type: array
+                  description: List of images to process, uploaded by the user
+                  items:
+                    type: string
+                stateids_input:
+                  type: array
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Object recolored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openaiFileResponse:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          description: The filename of the image
+                        mime_type:
+                          type: string
+                          description: The MIME type of the image
+                        content:
+                          type: string
+                          format: byte
+                          description: The base64 encoded recolored image content
+                  stateids_output:
+                    type: array
+                    description: The state ids of the recolored images, useful to chain edits
+                    items:
+                      type: string
+                  stateids_undo:
+                    type: array
+                    description: The state ids of the input images, useful to undo edits
+                    items:
+                      type: string
+  /shadow:
+    post:
+      operationId: shadow
+      x-openai-isConsequential: false
+      summary: Creates a shadow packshot of objects in images, based on text prompts
+      description: The user uploads images or references stateids, and text prompts describing the objects to create a
+        packshot for in each image. The agent associates images and object names. The API returns the packshot images,
+        stateids referencing the packshot images and stateids referencing the input images.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names,
+                background_colors and stateids_input (or openaiFileIdRefs) must have the same length.
+              properties:
+                user_message:
+                  type: string
+                  description: The (verbatim) last message sent by the user, that triggered this action
+                object_names:
+                  type: array
+                  description: List of strings describing the object to create a shadow packshot for
+                  items:
+                    type: string
+                background_colors:
+                  type: array
+                  description: List of hex colors (#rrggbb) to fill the background with
+                  items:
+                    type: string
+                    default: "#ffffff"
+                openaiFileIdRefs:
+                  type: array
+                  description: List of images to process, uploaded by the user
+                  items:
+                    type: string
+                stateids_input:
+                  type: array
+                  description: List of API stateids to use, from previous stateids_output or stateids_undo
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Packshots shadows created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openaiFileResponse:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          description: The filename of the image
+                        mime_type:
+                          type: string
+                          description: The MIME type of the image
+                        content:
+                          type: string
+                          format: byte
+                          description: The base64 encoded shadow packshot image content
+                  stateids_output:
+                    type: array
+                    description: The state ids of the shadow packshot images, useful to chain edits
+                    items:
+                      type: string
+                  stateids_undo:
+                    type: array
+                    description: The state ids of the input images, useful to undo edits
+                    items:
+                      type: string
+  /undo:
+    post:
+      operationId: undo
+      x-openai-isConsequential: false
+      summary: Utility endpoint to get images from stateids, useful undo or revert to the input images of a previous edit
+      description: The user references stateids. The API returns the previous images, and stateids referencing the previous images.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_message:
+                  type: string
+                  description: The (verbatim) last message sent by the user, that triggered this action
+                stateids_undo:
+                  type: array
+                  description: List of API stateids to undo, filled from previous stateids_undo
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Image retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openaiFileResponse:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          description: The filename of the image
+                        mime_type:
+                          type: string
+                          description: The MIME type of the image
+                        content:
+                          type: string
+                          format: byte
+                          description: The base64 encoded previous image content
+                  stateids_output:
+                    type: array
+                    description: The state ids of the previous images, useful to chain edits
+                    items:
+                      type: string
