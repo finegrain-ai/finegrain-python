@@ -36,6 +36,8 @@ async def process(
     if isinstance(result_positive_detect, ErrorResult):
         raise ValueError(f"Erase internal positive detect error: {result_positive_detect.error}")
     positive_detections = result_positive_detect.results
+    if len(positive_detections) == 0:
+        raise ValueError(f"Erase internal positive detect error: not detection found for prompt {positive_prompt}")
     app.logger.debug(f"{positive_detections=}")
 
     # call detect for negative objects
@@ -48,7 +50,7 @@ async def process(
         if isinstance(result_negative_detect, ErrorResult):
             raise ValueError(f"Erase internal negative detect error: {result_negative_detect.error}")
         negative_detections = result_negative_detect.results
-        app.logger.debug(f"{negative_detections=}")
+    app.logger.debug(f"{negative_detections=}")
 
     # get segments for positive objects
     stateids_mask_positive = []
@@ -73,7 +75,7 @@ async def process(
             if isinstance(result_segment, ErrorResult):
                 raise ValueError(f"Recolor internal negative segment error: {result_segment.error}")
             stateids_mask_negative.append(result_segment.state_id)
-        app.logger.debug(f"{stateids_mask_negative=}")
+    app.logger.debug(f"{stateids_mask_negative=}")
 
     # merge positive masks
     if len(stateids_mask_positive) == 1:
