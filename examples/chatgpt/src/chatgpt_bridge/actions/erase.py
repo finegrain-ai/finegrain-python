@@ -1,4 +1,4 @@
-from finegrain import BoundingBox, ErrorResult, StateID
+from finegrain import ErrorResult, StateID
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
@@ -10,7 +10,7 @@ from chatgpt_bridge.utils import OpenaiFileIdRef, OpenaiFileResponse
 class EraseParams(BaseModel):
     openaiFileIdRefs: list[OpenaiFileIdRef] | None = None  # noqa: N815
     stateids_input: list[StateID] | None = None
-    object_names: list[list[str]] | None = None
+    prompts: list[str] | None = None
 
 
 class EraseOutput(BaseModel):
@@ -22,26 +22,24 @@ class EraseOutput(BaseModel):
 async def process(
     ctx: EditorAPIContext,
     stateid_input: StateID,
-    object_names: list[str],
+    prompt: str,
 ) -> StateID:
-    # call infer-bbox for each object
-    bboxes: list[BoundingBox] = []
-    for name in object_names:
-        result_bbox = await ctx.call_async.infer_bbox(
-            state_id=stateid_input,
-            product_name=name,
-        )
-        if isinstance(result_bbox, ErrorResult):
-            raise ValueError(f"Eraser internal infer_bbox error: {result_bbox.error}")
-        bboxes.append(result_bbox.bbox)
-    app.logger.debug(f"{bboxes=}")
+    # call detect
+    result_detect = await ctx.call_async.detect(
+        state_id=stateid_input,
+        prompt=prompt,
+    )
+    if isinstance(result_detect, ErrorResult):
+        raise ValueError(f"Erase internal detect error: {result_detect.error}")
+    detections = result_detect.results
+    app.logger.debug(f"{detections=}")
 
-    # call segment for each bbox
+    # call segment on each detection
     stateids_segment = []
-    for result_bbox in bboxes:
+    for detection in detections:
         result_segment = await ctx.call_async.segment(
             state_id=stateid_input,
-            bbox=result_bbox,
+            bbox=detection.bbox,
         )
         if isinstance(result_segment, ErrorResult):
             raise ValueError(f"Erase internal segment error: {result_segment.error}")
@@ -96,21 +94,17 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
     app.logger.debug(f"{stateids_input=}")
 
     # validate the inputs
-    if input_data.object_names is None:
-        raise ValueError("Eraser input error: object_names is required")
-    if len(stateids_input) != len(input_data.object_names):
-        raise ValueError("Eraser input error: stateids_input and object_names must have the same length")
-    for object_names in input_data.object_names:
-        if not object_names:
-            raise ValueError("Eraser input error: object list cannot be empty")
-        for object_name in object_names:
-            if not object_name:
-                raise ValueError("Eraser input error: object name cannot be empty")
+    if input_data.prompts is None:
+        raise ValueError("Eraser input error: prompts is required")
+    if any(not prompt for prompt in input_data.prompts):
+        raise ValueError("Eraser input error: all the prompts must be not empty")
+    if len(stateids_input) != len(input_data.prompts):
+        raise ValueError("Eraser input error: stateids_input and prompts must have the same length")
 
     # process the inputs
     stateids_erased = [
-        await process(ctx, stateid_input, object_names)
-        for stateid_input, object_names in zip(stateids_input, input_data.object_names, strict=True)
+        await process(ctx, stateid_input, prompt)
+        for stateid_input, prompt in zip(stateids_input, input_data.prompts, strict=True)
     ]
     app.logger.debug(f"{stateids_erased=}")
 

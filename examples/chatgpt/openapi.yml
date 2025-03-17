@@ -87,9 +87,9 @@ paths:
     post:
       operationId: erase
       x-openai-isConsequential: false
-      summary: Erase objects from images based on a text prompt
+      summary: Erase objects from images based on text prompts
       description: The user uploads images or references stateids, and text prompts describing the objects to be erased in
-        each image. The agent associates images and object names. The API returns the altered images, stateids
+        each image. The agent associates images and prompts. The API returns the altered images, stateids
         referencing the altered images and stateids referencing the input images.
       requestBody:
         required: true
@@ -98,20 +98,17 @@ paths:
             schema:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. prompts
                 and stateids_input (or openaiFileIdRefs) must have the same length.
               properties:
                 user_message:
                   type: string
                   description: The (verbatim) last message sent by the user, that triggered this action
-                object_names:
+                prompts:
                   type: array
-                  description: List of list of objects to erase in each image
+                  description: List of prompts describing which objects to erase in the associated image
                   items:
-                    type: array
-                    description: List of objects to erase in the associated image
-                    items:
-                      type: string
+                    type: string
                 openaiFileIdRefs:
                   type: array
                   description: List of images to process, uploaded by the user
