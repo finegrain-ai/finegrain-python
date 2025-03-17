@@ -14,8 +14,8 @@ paths:
       x-openai-isConsequential: false
       summary: Cutout objects from images based on text prompts
       description: The user uploads images or references some stateids, and text prompts describing the objects to be cutout
-        in each image. The agent associates images and prompts. The API returns the cutouts, stateids referencing
-        the cutouts and stateids referencing the input images.
+        in each image. The agent associates images and prompts. The API returns the cutouts, stateids referencing the
+        cutouts and stateids referencing the input images.
       requestBody:
         required: true
         content:
@@ -24,14 +24,16 @@ paths:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
                 openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names,
-                background_colors and stateids_input (or openaiFileIdRefs) must have the same length.
+                background_colors and stateids_input (or openaiFileIdRefs) must have the same length (which is the
+                number of images uploaded).
               properties:
                 user_message:
                   type: string
                   description: The (verbatim) last message sent by the user, that triggered this action
                 prompts:
                   type: array
-                  description: List of prompts describing which objects to cutout in each image
+                  description: List of prompts describing which objects to cutout in each image. One prompt per image, a prompt can
+                    include multiple objects.
                   items:
                     type: string
                 background_colors:
@@ -89,8 +91,8 @@ paths:
       x-openai-isConsequential: false
       summary: Erase objects from images based on text prompts
       description: The user uploads images or references stateids, and text prompts describing the objects to be erased in
-        each image. The agent associates images and prompts. The API returns the altered images, stateids
-        referencing the altered images and stateids referencing the input images.
+        each image. The agent associates images and prompts. The API returns the altered images, stateids referencing
+        the altered images and stateids referencing the input images.
       requestBody:
         required: true
         content:
@@ -98,15 +100,16 @@ paths:
             schema:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. prompts
-                and stateids_input (or openaiFileIdRefs) must have the same length.
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. prompts and
+                stateids_input (or openaiFileIdRefs) must have the same length (which is the number of images uploaded).
               properties:
                 user_message:
                   type: string
                   description: The (verbatim) last message sent by the user, that triggered this action
                 prompts:
                   type: array
-                  description: List of prompts describing which objects to erase in the associated image
+                  description: List of prompts describing which objects to erase in the associated image. One prompt per image, a prompt
+                    can include multiple objects.
                   items:
                     type: string
                 openaiFileIdRefs:
@@ -158,8 +161,8 @@ paths:
       x-openai-isConsequential: false
       summary: Recolors an object in an image based on text prompts
       description: The user uploads images or references some stateids, and text prompts describing the objects to recolor in
-        each image. The agent associates images and prompts. The API returns the recolored images, stateids
-        referencing the recolored images and stateids referencing the input images.
+        each image. The agent associates images and prompts. The API returns the recolored images, stateids referencing
+        the recolored images and stateids referencing the input images.
       requestBody:
         required: true
         content:
@@ -168,20 +171,22 @@ paths:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
                 openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time.
-                positive_prompts, negative_prompts, object_colors and stateids_input (or openaiFileIdRefs)
-                must have the same length (which is the number of images uploaded).
+                positive_prompts, negative_prompts, object_colors and stateids_input (or openaiFileIdRefs) must have the
+                same length (which is the number of images uploaded).
               properties:
                 user_message:
                   type: string
                   description: The (verbatim) last message sent by the user, that triggered this action
                 positive_prompts:
                   type: array
-                  description: List of prompts describing all the objects to recolor in the associated image. One prompt per image, a prompt can include multiple objects.
+                  description: List of prompts describing all the objects to recolor in the associated image. One prompt per image, a
+                    prompt can include multiple objects.
                   items:
                     type: string
                 negative_prompts:
                   type: array
-                  description: List of prompts describing all the objects to not recolor in the associated image. One prompt per image, a prompt can include multiple objects.
+                  description: List of prompts describing all the objects to NOT recolor in the associated image. One prompt per image, a
+                    prompt can include multiple objects.
                   items:
                     type: string
                 object_colors:
@@ -247,15 +252,17 @@ paths:
             schema:
               type: object
               description: The images are either uploaded to the API via openaiFileIdRefs or referenced via stateids_input. Either
-                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. object_names,
-                background_colors and stateids_input (or openaiFileIdRefs) must have the same length.
+                openaiFileIdRefs or stateids_input must be provided, both cannot be used at the same time. prompts,
+                background_colors and stateids_input (or openaiFileIdRefs) must have the same length (which is the
+                number of images uploaded).
               properties:
                 user_message:
                   type: string
                   description: The (verbatim) last message sent by the user, that triggered this action
-                object_names:
+                prompts:
                   type: array
-                  description: List of strings describing the object to create a shadow packshot for
+                  description: List of prompts describing the object to create a shadow packshot for. One prompt per image, a prompt can
+                    include multiple objects.
                   items:
                     type: string
                 background_colors:
