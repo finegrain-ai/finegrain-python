@@ -1067,7 +1067,7 @@ class EditorApiAsyncClient:
     async def blend(
         self,
         image_state_id: StateID,
-        mask_state_id: StateID,
+        cutout_state_id: StateID,
         bbox: BoundingBox | None = None,
         flip: bool = False,
         rotation_angle: float = 0.0,
@@ -1086,7 +1086,7 @@ class EditorApiAsyncClient:
         if seed is not None:
             params["seed"] = seed
         st, ok = await self.ctx.call_skill(
-            f"blend/{image_state_id}/{mask_state_id}",
+            f"blend/{image_state_id}/{cutout_state_id}",
             params,
             timeout=timeout,
         )
