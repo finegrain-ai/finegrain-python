@@ -13,9 +13,9 @@ paths:
       operationId: cutout
       x-openai-isConsequential: false
       summary: Cutout objects from images based on text prompts
-      description: The user uploads images or references some stateids, and text prompts describing the objects to be cutout
-        in each image. The agent associates images and prompts. The API returns the cutouts, stateids referencing the
-        cutouts and stateids referencing the input images.
+      description: The user uploads images (or references stateids), and text prompts describing the objects to be cutout in
+        each image. The agent correctly pairs each image with a text prompt. The API returns the cutouts, stateids
+        referencing the cutouts and stateids referencing the input images.
       requestBody:
         required: true
         content:
@@ -90,9 +90,9 @@ paths:
       operationId: erase
       x-openai-isConsequential: false
       summary: Erase objects from images based on text prompts
-      description: The user uploads images or references stateids, and text prompts describing the objects to be erased in
-        each image. The agent associates images and prompts. The API returns the altered images, stateids referencing
-        the altered images and stateids referencing the input images.
+      description: The user uploads images (or references stateids), and text prompts describing the objects to be erased in
+        each image. The agent correctly pairs each image with a text prompt. The API returns the altered images,
+        stateids referencing the altered images and stateids referencing the input images.
       requestBody:
         required: true
         content:
@@ -160,9 +160,9 @@ paths:
       operationId: recolor
       x-openai-isConsequential: false
       summary: Recolors an object in an image based on text prompts
-      description: The user uploads images or references some stateids, and text prompts describing the objects to recolor in
-        each image. The agent associates images and prompts. The API returns the recolored images, stateids referencing
-        the recolored images and stateids referencing the input images.
+      description: The user uploads images (or references stateids), and text prompts describing the objects to recolor in
+        each image.  The agent correctly pairs each image with a text prompt. The API returns the recolored images,
+        stateids referencing the recolored images and stateids referencing the input images.
       requestBody:
         required: true
         content:
@@ -242,8 +242,8 @@ paths:
       operationId: shadow
       x-openai-isConsequential: false
       summary: Creates a shadow packshot of objects in images, based on text prompts
-      description: The user uploads images or references stateids, and text prompts describing the objects to create a
-        packshot for in each image. The agent associates images and object names. The API returns the packshot images,
+      description: The user uploads images (or references stateids), and text prompts describing the objects to packshot in
+        each image. The agent correctly pairs each image with a text prompt. The API returns the packshot images,
         stateids referencing the packshot images and stateids referencing the input images.
       requestBody:
         required: true
