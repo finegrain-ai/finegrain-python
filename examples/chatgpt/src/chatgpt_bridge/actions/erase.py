@@ -24,53 +24,21 @@ async def process(
     stateid_input: StateID,
     prompt: str,
 ) -> StateID:
-    # call detect
-    result_detect = await ctx.call_async.detect(
+    # call multi_segment
+    stateid_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
         prompt=prompt,
     )
-    if isinstance(result_detect, ErrorResult):
-        raise ValueError(f"Erase internal detect error: {result_detect.error}")
-    detections = result_detect.results
-    if len(detections) == 0:
-        raise ValueError(f"Erase internal detect error: no detection found for prompt {prompt}")
-    app.logger.debug(f"{detections=}")
-
-    # call segment on each detection
-    stateids_segment = []
-    for detection in detections:
-        result_segment = await ctx.call_async.segment(
-            state_id=stateid_input,
-            bbox=detection.bbox,
-        )
-        if isinstance(result_segment, ErrorResult):
-            raise ValueError(f"Erase internal segment error: {result_segment.error}")
-        stateids_segment.append(result_segment.state_id)
-    app.logger.debug(f"{stateids_segment=}")
-
-    # call merge-masks
-    if len(stateids_segment) == 0:
-        raise ValueError("Erase internal merge_masks error: no segment found")
-    elif len(stateids_segment) == 1:
-        stateid_mask_union = stateids_segment[0]
-    else:
-        result_mask_union = await ctx.call_async.merge_masks(
-            state_ids=tuple(stateids_segment),  # type: ignore
-            operation="union",
-        )
-        if isinstance(result_mask_union, ErrorResult):
-            raise ValueError(f"Erase internal merge_masks error: {result_mask_union.error}")
-        stateid_mask_union = result_mask_union.state_id
-    app.logger.debug(f"{stateid_mask_union=}")
+    app.logger.debug(f"{stateid_segment=}")
 
     # call erase skill
     result_erase = await ctx.call_async.erase(
         image_state_id=stateid_input,
-        mask_state_id=stateid_mask_union,
+        mask_state_id=stateid_segment,
         mode="express",
     )
     if isinstance(result_erase, ErrorResult):
-        raise ValueError(f"Erase internal erase error: {result_erase.error}")
+        raise ValueError(f"[Erase] internal erase error: {result_erase.error}")
     stateid_erase = result_erase.state_id
     app.logger.debug(f"{stateid_erase=}")
 
@@ -94,16 +62,16 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("Erase input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[Erase] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate the inputs
     if input_data.prompts is None:
-        raise ValueError("Erase input error: prompts is required")
+        raise ValueError("[Erase] input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("Erase input error: all the prompts must be not empty")
+        raise ValueError("[Erase] input error: all the prompts must be not empty")
     if len(stateids_input) != len(input_data.prompts):
-        raise ValueError("Erase input error: stateids_input and prompts must have the same length")
+        raise ValueError("[Erase] input error: stateids_input and prompts must have the same length")
 
     # process the inputs
     stateids_erased = [

@@ -27,52 +27,20 @@ async def process(
     background_color: str,
     prompt: str,
 ) -> tuple[Image.Image, StateID]:
-    # call detect
-    result_detect = await ctx.call_async.detect(
+    # call multi_segment
+    stateid_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
         prompt=prompt,
     )
-    if isinstance(result_detect, ErrorResult):
-        raise ValueError(f"Cutout internal detect error: {result_detect.error}")
-    detections = result_detect.results
-    if len(detections) == 0:
-        raise ValueError(f"Cutout internal detect error: no detection found for prompt {prompt}")
-    app.logger.debug(f"{detections=}")
-
-    # call segment on each detection
-    stateids_segment = []
-    for detection in detections:
-        result_segment = await ctx.call_async.segment(
-            state_id=stateid_input,
-            bbox=detection.bbox,
-        )
-        if isinstance(result_segment, ErrorResult):
-            raise ValueError(f"Cutout internal segment error: {result_segment.error}")
-        stateids_segment.append(result_segment.state_id)
-    app.logger.debug(f"{stateids_segment=}")
-
-    # call merge-masks
-    if len(stateids_segment) == 0:
-        raise ValueError("Cutout internal merge_masks error: no segment found")
-    elif len(stateids_segment) == 1:
-        stateid_mask_union = stateids_segment[0]
-    else:
-        result_mask_union = await ctx.call_async.merge_masks(
-            state_ids=tuple(stateids_segment),  # type: ignore
-            operation="union",
-        )
-        if isinstance(result_mask_union, ErrorResult):
-            raise ValueError(f"Cutout internal merge_masks error: {result_mask_union.error}")
-        stateid_mask_union = result_mask_union.state_id
-    app.logger.debug(f"{stateid_mask_union=}")
+    app.logger.debug(f"{stateid_segment=}")
 
     # call cutout
     result_cutout = await ctx.call_async.cutout(
         image_state_id=stateid_input,
-        mask_state_id=stateid_mask_union,
+        mask_state_id=stateid_segment,
     )
     if isinstance(result_cutout, ErrorResult):
-        raise ValueError(f"Cutout internal cutout error: {result_cutout.error}")
+        raise ValueError(f"[Cutout] internal cutout error: {result_cutout.error}")
     stateid_cutout = result_cutout.state_id
     app.logger.debug(f"{stateid_cutout=}")
 
@@ -119,20 +87,20 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("Cutout input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[Cutout] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate input data
     if input_data.prompts is None:
-        raise ValueError("Cutout input error: prompts is required")
+        raise ValueError("[Cutout] input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("Cutout input error: all the prompts must be not empty")
+        raise ValueError("[Cutout] input error: all the prompts must be not empty")
     if len(stateids_input) != len(input_data.prompts):
-        raise ValueError("Cutout input error: stateids_input and prompts must have the same length")
+        raise ValueError("[Cutout] input error: stateids_input and prompts must have the same length")
     if input_data.background_colors is None:
         input_data.background_colors = ["#ffffff"] * len(stateids_input)
     if len(input_data.background_colors) != len(stateids_input):
-        raise ValueError("Cutout input error: stateids_input and background_colors must have the same length")
+        raise ValueError("[Cutout] input error: stateids_input and background_colors must have the same length")
 
     # process the inputs
     outputs = [
