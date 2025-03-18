@@ -14,7 +14,7 @@ paths:
       x-openai-isConsequential: false
       summary: Cutout objects from images based on text prompts
       description: The user uploads images (or references stateids), and text prompts describing the objects to be cutout in
-        each image. The agent correctly pairs each image with a text prompt. The API returns the cutouts, stateids
+        each image. The agent correctly pairs images and prompts. The API returns the cutouts, stateids
         referencing the cutouts and stateids referencing the input images.
       requestBody:
         required: true
@@ -91,7 +91,7 @@ paths:
       x-openai-isConsequential: false
       summary: Erase objects from images based on text prompts
       description: The user uploads images (or references stateids), and text prompts describing the objects to be erased in
-        each image. The agent correctly pairs each image with a text prompt. The API returns the altered images,
+        each image. The agent correctly pairs images and prompts. The API returns the altered images,
         stateids referencing the altered images and stateids referencing the input images.
       requestBody:
         required: true
@@ -161,7 +161,7 @@ paths:
       x-openai-isConsequential: false
       summary: Recolors an object in an image based on text prompts
       description: The user uploads images (or references stateids), and text prompts describing the objects to recolor in
-        each image.  The agent correctly pairs each image with a text prompt. The API returns the recolored images,
+        each image.  The agent correctly pairs images and prompts. The API returns the recolored images,
         stateids referencing the recolored images and stateids referencing the input images.
       requestBody:
         required: true
@@ -243,7 +243,7 @@ paths:
       x-openai-isConsequential: false
       summary: Creates a shadow packshot of objects in images, based on text prompts
       description: The user uploads images (or references stateids), and text prompts describing the objects to packshot in
-        each image. The agent correctly pairs each image with a text prompt. The API returns the packshot images,
+        each image. The agent correctly pairs images and prompts. The API returns the packshot images,
         stateids referencing the packshot images and stateids referencing the input images.
       requestBody:
         required: true
