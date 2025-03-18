@@ -23,7 +23,7 @@ def require_basic_auth_token(token: str):
         async def decorated_function(*args, **kwargs):
             auth_header = request.headers.get("Authorization", "")
             if auth_header != f"Basic {token}":
-                return json_error("Unauthorized", 401)
+                return json_error("Unauthorized, wrong basic auth token", 401)
             return await f(*args, **kwargs)
 
         return decorated_function
@@ -33,18 +33,14 @@ def require_basic_auth_token(token: str):
 
 def image_to_bytes(image: Image.Image) -> io.BytesIO:
     data = io.BytesIO()
-    image.save(data, format="PNG", optimize=True)
+    image.convert("RGB").save(data, format="JPEG", quality=95)
     data.seek(0)
     return data
 
 
-def image_to_base64(
-    image: Image.Image,
-    image_format: str,
-) -> str:
-    buffer = io.BytesIO()
-    image.save(buffer, format=image_format)
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+def image_to_base64(image: Image.Image) -> str:
+    image_data = image_to_bytes(image).getvalue()
+    return base64.b64encode(image_data).decode("utf-8")
 
 
 class OpenaiFileIdRef(BaseModel):
@@ -66,7 +62,7 @@ class OpenaiFileResponse(BaseModel):
         return OpenaiFileResponse(
             name=f"{name}.jpg",
             mime_type="image/jpeg",
-            content=image_to_base64(image.convert("RGB"), "JPEG"),
+            content=image_to_base64(image),
         )
 
     def __repr__(self) -> str:

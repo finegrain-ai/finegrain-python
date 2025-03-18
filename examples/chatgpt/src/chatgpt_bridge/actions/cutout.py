@@ -12,7 +12,7 @@ class CutoutParams(BaseModel):
     openaiFileIdRefs: list[OpenaiFileIdRef] | None = None  # noqa: N815
     stateids_input: list[StateID] | None = None
     background_colors: list[str] | None = None
-    object_names: list[str] | None = None
+    prompts: list[str] | None = None
 
 
 class CutoutOutput(BaseModel):
@@ -25,26 +25,13 @@ async def process(
     ctx: EditorAPIContext,
     stateid_input: StateID,
     background_color: str,
-    object_name: str,
+    prompt: str,
 ) -> tuple[Image.Image, StateID]:
-    # call infer-bbox
-    result_bbox = await ctx.call_async.infer_bbox(
+    # call multi_segment
+    stateid_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
-        product_name=object_name,
+        prompt=prompt,
     )
-    if isinstance(result_bbox, ErrorResult):
-        raise ValueError(f"Cutout internal infer_bbox error: {result_bbox.error}")
-    bbox = result_bbox.bbox
-    app.logger.debug(f"{bbox=}")
-
-    # call segment
-    result_segment = await ctx.call_async.segment(
-        state_id=stateid_input,
-        bbox=bbox,
-    )
-    if isinstance(result_segment, ErrorResult):
-        raise ValueError(f"Cutout internal segment error: {result_segment.error}")
-    stateid_segment = result_segment.state_id
     app.logger.debug(f"{stateid_segment=}")
 
     # call cutout
@@ -53,7 +40,7 @@ async def process(
         mask_state_id=stateid_segment,
     )
     if isinstance(result_cutout, ErrorResult):
-        raise ValueError(f"Cutout internal cutout error: {result_cutout.error}")
+        raise ValueError(f"[Cutout] internal cutout error: {result_cutout.error}")
     stateid_cutout = result_cutout.state_id
     app.logger.debug(f"{stateid_cutout=}")
 
@@ -100,33 +87,32 @@ async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("Cutout input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[Cutout] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate input data
-    if input_data.object_names is None:
-        raise ValueError("Cutout input error: object_names is required")
-    if len(stateids_input) != len(input_data.object_names):
-        raise ValueError("Cutout input error: stateids_input and object_names must have the same length")
-    for object_name in input_data.object_names:
-        if not object_name:
-            raise ValueError("Cutout input error: object name cannot be empty")
+    if input_data.prompts is None:
+        raise ValueError("[Cutout] input error: prompts is required")
+    if any(not prompt for prompt in input_data.prompts):
+        raise ValueError("[Cutout] input error: all the prompts must be not empty")
+    if len(stateids_input) != len(input_data.prompts):
+        raise ValueError("[Cutout] input error: stateids_input and prompts must have the same length")
     if input_data.background_colors is None:
         input_data.background_colors = ["#ffffff"] * len(stateids_input)
     if len(input_data.background_colors) != len(stateids_input):
-        raise ValueError("Cutout input error: stateids_input and background_colors must have the same length")
+        raise ValueError("[Cutout] input error: stateids_input and background_colors must have the same length")
 
     # process the inputs
     outputs = [
         await process(
             ctx=ctx,
-            object_name=object_name,
+            prompt=prompt,
             stateid_input=stateid_input,
             background_color=background_color,
         )
-        for stateid_input, object_name, background_color in zip(
+        for stateid_input, prompt, background_color in zip(
             stateids_input,
-            input_data.object_names,
+            input_data.prompts,
             input_data.background_colors,
             strict=True,
         )

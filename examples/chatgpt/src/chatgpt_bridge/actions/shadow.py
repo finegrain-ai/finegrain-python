@@ -11,7 +11,7 @@ class ShadowParams(BaseModel):
     openaiFileIdRefs: list[OpenaiFileIdRef] | None = None  # noqa: N815
     stateids_input: list[StateID] | None = None
     background_colors: list[str] | None = None
-    object_names: list[str] | None = None
+    prompts: list[str] | None = None
 
 
 class ShadowOutput(BaseModel):
@@ -23,33 +23,20 @@ class ShadowOutput(BaseModel):
 async def process(
     ctx: EditorAPIContext,
     stateid_input: StateID,
-    object_name: str,
+    prompt: str,
     background_color: str,
 ) -> StateID:
-    # call infer-bbox
-    result_bbox = await ctx.call_async.infer_bbox(
+    # call multi_segment
+    stateid_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
-        product_name=object_name,
+        prompt=prompt,
     )
-    if isinstance(result_bbox, ErrorResult):
-        raise ValueError(f"Shadow internal infer_bbox error: {result_bbox.error}")
-    bbox = result_bbox.bbox
-    app.logger.debug(f"{bbox=}")
-
-    # call segment
-    result_mask = await ctx.call_async.segment(
-        state_id=stateid_input,
-        bbox=bbox,
-    )
-    if isinstance(result_mask, ErrorResult):
-        raise ValueError(f"Shadow internal segment error: {result_mask.error}")
-    stateid_mask = result_mask.state_id
-    app.logger.debug(f"{stateid_mask=}")
+    app.logger.debug(f"{stateid_segment=}")
 
     # call cutout
     result_cutout = await ctx.call_async.cutout(
         image_state_id=stateid_input,
-        mask_state_id=stateid_mask,
+        mask_state_id=stateid_segment,
     )
     if isinstance(result_cutout, ErrorResult):
         raise ValueError(f"Shadow internal cutout error: {result_cutout.error}")
@@ -62,7 +49,7 @@ async def process(
         background="transparent",
     )
     if isinstance(result_shadow, ErrorResult):
-        raise ValueError(f"Shadow internal shadow error: {result_shadow.error}")
+        raise ValueError(f"[Shadow] internal shadow error: {result_shadow.error}")
     stateid_shadow = result_shadow.state_id
     app.logger.debug(f"{stateid_shadow=}")
 
@@ -72,7 +59,7 @@ async def process(
         background=background_color,
     )
     if isinstance(result_bgcolor, ErrorResult):
-        raise ValueError(f"Shadow internal set_background_color error: {result_bgcolor.error}")
+        raise ValueError(f"[Shadow] internal set_background_color error: {result_bgcolor.error}")
     stateid_bgcolor = result_bgcolor.state_id
     app.logger.debug(f"{stateid_bgcolor=}")
 
@@ -96,39 +83,34 @@ async def _shadow(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("Shadow input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[Shadow] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
-    # validate object_names
-    if input_data.object_names is None:
-        raise ValueError("Shadow input error: object_names is required")
-    if len(stateids_input) != len(input_data.object_names):
-        raise ValueError("Shadow input error: stateids_input and object_names must have the same length")
-    for object_name in input_data.object_names:
-        if not object_name:
-            raise ValueError("Shadow input error: object name cannot be empty")
-            # return json_error("object name cannot be empty", 400)
+    # validate prompts
+    if input_data.prompts is None:
+        raise ValueError("[Shadow] input error: prompts is required")
+    if any(not prompt for prompt in input_data.prompts):
+        raise ValueError("[Shadow] input error: all the prompts must be not empty")
 
     # validate background_colors
     if input_data.background_colors is None:
         input_data.background_colors = ["#ffffff"] * len(stateids_input)
     if len(stateids_input) != len(input_data.background_colors):
-        raise ValueError("Shadow input error: stateids_input and background_colors must have the same length")
-    for background_color in input_data.background_colors:
-        if not background_color:
-            raise ValueError("Shadow input error: background color cannot be empty")
+        raise ValueError("[Shadow] input error: stateids_input and background_colors must have the same length")
+    if any(not color for color in input_data.background_colors):
+        raise ValueError("[Shadow] input error: all the background colors must be not empty")
 
     # process the inputs
     stateids_shadow = [
         await process(
             ctx=ctx,
             stateid_input=stateid_input,
-            object_name=object_name,
+            prompt=prompt,
             background_color=background_color,
         )
-        for stateid_input, object_name, background_color in zip(
+        for stateid_input, prompt, background_color in zip(
             stateids_input,
-            input_data.object_names,
+            input_data.prompts,
             input_data.background_colors,
             strict=True,
         )
