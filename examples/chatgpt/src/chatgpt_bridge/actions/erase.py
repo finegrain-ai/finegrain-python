@@ -32,6 +32,8 @@ async def process(
     if isinstance(result_detect, ErrorResult):
         raise ValueError(f"Erase internal detect error: {result_detect.error}")
     detections = result_detect.results
+    if len(detections) == 0:
+        raise ValueError(f"Erase internal detect error: no detection found for prompt {prompt}")
     app.logger.debug(f"{detections=}")
 
     # call segment on each detection
@@ -47,7 +49,9 @@ async def process(
     app.logger.debug(f"{stateids_segment=}")
 
     # call merge-masks
-    if len(stateids_segment) == 1:
+    if len(stateids_segment) == 0:
+        raise ValueError("Erase internal merge_masks error: no segment found")
+    elif len(stateids_segment) == 1:
         stateid_mask_union = stateids_segment[0]
     else:
         result_mask_union = await ctx.call_async.merge_masks(

@@ -78,7 +78,9 @@ async def process(
     app.logger.debug(f"{stateids_mask_negative=}")
 
     # merge positive masks
-    if len(stateids_mask_positive) == 1:
+    if len(stateids_mask_positive) == 0:
+        raise ValueError("Recolor internal positive merge masks error: no segment found")
+    elif len(stateids_mask_positive) == 1:
         stateid_mask_positive_union = stateids_mask_positive[0]
     else:
         result_mask_union = await ctx.call_async.merge_masks(
