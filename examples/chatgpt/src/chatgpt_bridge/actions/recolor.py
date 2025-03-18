@@ -48,7 +48,7 @@ async def process(
     # get difference between positive and negative masks
     if stateid_negative_segment is not None:
         result_mask_difference = await ctx.call_async.merge_masks(
-            state_ids=[stateid_positive_segment, stateid_positive_segment],
+            state_ids=[stateid_positive_segment, stateid_negative_segment],
             operation="difference",
         )
         if isinstance(result_mask_difference, ErrorResult):
