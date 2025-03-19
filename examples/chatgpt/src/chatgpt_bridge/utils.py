@@ -1,13 +1,21 @@
 import base64
 import io
-from functools import wraps
+from contextlib import asynccontextmanager
 
 from PIL import Image
 from pydantic import BaseModel
 from quart import Response, jsonify, request
 from quart import current_app as app
 
-StateID = str
+from chatgpt_bridge.context import EditorAPIContext
+from chatgpt_bridge.env import (
+    FG_API_PRIORITY,
+    FG_API_TIMEOUT,
+    FG_API_URL,
+    USER_AGENT,
+)
+
+FG_API_DUMMY_KEY = "FGAPI-DUMMMY-DUMMMY-DUMMMY-DUMMMY"
 
 
 def json_error(message: str, status: int = 400) -> Response:
@@ -17,18 +25,37 @@ def json_error(message: str, status: int = 400) -> Response:
     return response
 
 
-def require_basic_auth_token(token: str):
-    def decorator(f):
-        @wraps(f)
-        async def decorated_function(*args, **kwargs):
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header != f"Basic {token}":
-                return json_error("Unauthorized, wrong basic auth token", 401)
-            return await f(*args, **kwargs)
+@asynccontextmanager
+async def get_ctx():
+    # parse the token from the Authorization header
+    token = request.headers.get("Authorization")
+    assert token is not None, "Authorization header is required"
+    assert token.startswith("Bearer "), "Authorization token must be a Bearer token"
+    token = token.removeprefix("Bearer ")
 
-        return decorated_function
+    # create a new context
+    ctx = EditorAPIContext(
+        api_key=FG_API_DUMMY_KEY,
+        base_url=FG_API_URL,
+        priority=FG_API_PRIORITY,
+        default_timeout=FG_API_TIMEOUT,
+        user_agent=USER_AGENT,
+    )
 
-    return decorator
+    # set the token
+    ctx.token = token
+
+    # start the sse loop
+    await ctx.sse_start()
+
+    # yield the context
+    yield ctx
+
+    # stop the sse loop
+    await ctx.sse_stop()
+
+    # clear the token
+    ctx.token = None
 
 
 def image_to_bytes(image: Image.Image) -> io.BytesIO:
