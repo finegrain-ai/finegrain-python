@@ -1,4 +1,7 @@
+import asyncio
+
 from finegrain import ErrorResult, StateID
+from PIL import Image
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
@@ -27,7 +30,7 @@ async def process(
     stateid_input: StateID,
     positive_prompt: str,
     negative_prompt: str | None,
-) -> StateID:
+) -> tuple[StateID, Image.Image]:
     # call multi_segment for positive prompt
     stateid_positive_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
@@ -69,7 +72,10 @@ async def process(
     stateid_recolor = result_recolor.state_id
     app.logger.debug(f"{stateid_recolor=}")
 
-    return stateid_recolor
+    # download output image
+    pil_recolor = await ctx.call_async.download_pil_image(stateid_recolor)
+
+    return stateid_recolor, pil_recolor
 
 
 async def recolor(ctx: EditorAPIContext, request: Request) -> Response:
@@ -79,63 +85,66 @@ async def recolor(ctx: EditorAPIContext, request: Request) -> Response:
     input_data = RecolorParams(**input_json)
     app.logger.debug(f"{input_data=}")
 
-    # get stateids_input, or create them from openaiFileIdRefs
+    # validate image input
     if input_data.stateids_input:
-        stateids_input = input_data.stateids_input
+        len_stateids_input = len(input_data.stateids_input)
     elif input_data.openaiFileIdRefs:
-        stateids_input: list[StateID] = []
-        for oai_ref in input_data.openaiFileIdRefs:
-            if oai_ref.download_link:
-                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
-                stateids_input.append(stateid_input)
+        len_stateids_input = len(input_data.openaiFileIdRefs)
     else:
         raise ValueError("[recolor] input error: stateids_input or openaiFileIdRefs is required")
-    app.logger.debug(f"{stateids_input=}")
 
     # validate object_colors
     if input_data.object_colors is None:
         raise ValueError("[recolor] input error: object_colors is required")
-    if len(stateids_input) != len(input_data.object_colors):
+    if len_stateids_input != len(input_data.object_colors):
         raise ValueError("[recolor] input error: stateids_input and object_colors must have the same length")
 
     # validate positive_prompts
     if input_data.positive_prompts is None:
         raise ValueError("[recolor] input error: positive_prompts is required")
-    if len(stateids_input) != len(input_data.positive_prompts):
+    if len_stateids_input != len(input_data.positive_prompts):
         raise ValueError("[recolor] input error: stateids_input and positive_prompts must have the same length")
     if any(not prompt for prompt in input_data.positive_prompts):
         raise ValueError("[recolor] input error: all the positive prompts must be not empty")
 
     # validate negative_object_names
     if input_data.negative_prompts is None:
-        input_data.negative_prompts = [None] * len(stateids_input)
-    if len(stateids_input) != len(input_data.negative_prompts):
+        input_data.negative_prompts = [None] * len_stateids_input
+    if len_stateids_input != len(input_data.negative_prompts):
         raise ValueError("[recolor] input error: stateids_input and negative prompts must have the same length")
 
-    # process the inputs
-    stateids_recolor = [
-        await process(
-            ctx=ctx,
-            object_color=object_color,
-            stateid_input=stateid_input,
-            positive_prompt=positive_prompt,
-            negative_prompt=negative_prompt,
-        )
-        for stateid_input, positive_prompt, negative_prompt, object_color in zip(
-            stateids_input,
-            input_data.positive_prompts,
-            input_data.negative_prompts,
-            input_data.object_colors,
-            strict=True,
-        )
-    ]
-    app.logger.debug(f"{stateids_recolor=}")
+    # get stateids_input, or create them from openaiFileIdRefs
+    if input_data.stateids_input:
+        stateids_input = input_data.stateids_input
+    elif input_data.openaiFileIdRefs:
+        stateids_input = [await ref.get_stateid(ctx) for ref in input_data.openaiFileIdRefs]
+    else:
+        raise ValueError("[recolor] input error: stateids_input or openaiFileIdRefs is required")
+    app.logger.debug(f"{stateids_input=}")
 
-    # download output images
-    recolor_imgs = [
-        await ctx.call_async.download_pil_image(stateid_recolor)  #
-        for stateid_recolor in stateids_recolor
-    ]
+    # process the inputs
+    async with asyncio.TaskGroup() as tg:
+        responses_recolor = [
+            tg.create_task(
+                process(
+                    ctx=ctx,
+                    object_color=object_color,
+                    stateid_input=stateid_input,
+                    positive_prompt=positive_prompt,
+                    negative_prompt=negative_prompt,
+                )
+            )
+            for object_color, stateid_input, positive_prompt, negative_prompt in zip(
+                input_data.object_colors,
+                stateids_input,
+                input_data.positive_prompts,
+                input_data.negative_prompts,
+                strict=True,
+            )
+        ]
+    results_recolor = [r.result() for r in responses_recolor]
+    stateids_recolor = [r[0] for r in results_recolor]
+    recolor_imgs = [r[1] for r in results_recolor]
 
     # build output response
     output_data = RecolorOutput(
