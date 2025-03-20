@@ -72,7 +72,7 @@ async def process(
     return stateid_recolor
 
 
-async def _recolor(ctx: EditorAPIContext, request: Request) -> Response:
+async def recolor(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")

@@ -70,7 +70,7 @@ async def process(
     return cutout_margin, stateid_cutout_margin
 
 
-async def _cutout(ctx: EditorAPIContext, request: Request) -> Response:
+async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")

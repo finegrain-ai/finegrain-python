@@ -16,7 +16,7 @@ class UndoOutput(BaseModel):
     stateids_output: list[StateID]
 
 
-async def _undo(ctx: EditorAPIContext, request: Request) -> Response:
+async def undo(ctx: EditorAPIContext, request: Request) -> Response:
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")

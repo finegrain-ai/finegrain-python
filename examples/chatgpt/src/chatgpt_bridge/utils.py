@@ -2,6 +2,7 @@ import base64
 import io
 from contextlib import asynccontextmanager
 
+from finegrain import StateID
 from PIL import Image
 from pydantic import BaseModel
 from quart import Response, jsonify, request
@@ -18,7 +19,7 @@ from chatgpt_bridge.env import (
 FG_API_DUMMY_KEY = "FGAPI-DUMMMY-DUMMMY-DUMMMY-DUMMMY"
 
 
-def json_error(message: str, status: int = 400) -> Response:
+def json_error(message: str | list[str], status: int = 400) -> Response:
     response = jsonify(error=message)
     response.status_code = status
     app.logger.error(message)
@@ -76,6 +77,9 @@ class OpenaiFileIdRef(BaseModel):
     name: str | None = None
     mime_type: str | None = None
     download_link: str
+
+    async def get_stateid(self, ctx: EditorAPIContext) -> StateID:
+        return await ctx.call_async.upload_link_image(self.download_link)
 
 
 class OpenaiFileResponse(BaseModel):

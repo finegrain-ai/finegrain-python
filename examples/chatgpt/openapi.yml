@@ -32,8 +32,8 @@ paths:
                   description: The (verbatim) last message sent by the user, that triggered this action
                 prompts:
                   type: array
-                  description: List of prompts describing which objects to cutout in each image. One prompt per image, a prompt can
-                    include multiple objects.
+                  description: List of prompts describing which objects to cutout in each image.
+                    One prompt per image, a prompt can include multiple comma seperated objects.
                   items:
                     type: string
                 background_colors:
@@ -111,8 +111,8 @@ paths:
                   description: The API output quality mode use ("standard" or "premium")
                 prompts:
                   type: array
-                  description: List of prompts describing which objects to erase in the associated image. One prompt per image, a prompt
-                    can include multiple objects.
+                  description: List of prompts describing which objects to erase in the associated image.
+                    One prompt per image, a prompt can include multiple comma seperated objects.
                   items:
                     type: string
                 openaiFileIdRefs:
@@ -182,14 +182,14 @@ paths:
                   description: The (verbatim) last message sent by the user, that triggered this action
                 positive_prompts:
                   type: array
-                  description: List of prompts describing all the objects to recolor in the associated image. One prompt per image, a
-                    prompt can include multiple objects.
+                  description: List of prompts describing all the objects to recolor in the associated image.
+                    One prompt per image, a prompt can include multiple comma seperated objects.
                   items:
                     type: string
                 negative_prompts:
                   type: array
-                  description: List of prompts describing all the objects to NOT recolor in the associated image. One prompt per image, a
-                    prompt can include multiple objects.
+                  description: List of prompts describing all the objects to NOT recolor in the associated image, explicitely specified by the user.
+                    One prompt per image, a prompt can include multiple comma seperated objects.
                   items:
                     type: string
                 object_colors:
@@ -264,8 +264,8 @@ paths:
                   description: The (verbatim) last message sent by the user, that triggered this action
                 prompts:
                   type: array
-                  description: List of prompts describing the object to create a shadow packshot for. One prompt per image, a prompt can
-                    include multiple objects.
+                  description: List of prompts describing the object to create a shadow packshot for.
+                    One prompt per image, a prompt can include multiple comma seperated objects.
                   items:
                     type: string
                 background_colors:

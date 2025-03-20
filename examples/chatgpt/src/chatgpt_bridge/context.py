@@ -19,8 +19,8 @@ class EditorApiAsyncClient(_EditorApiAsyncClient):
     async def download_pil_image(
         self,
         st: StateID,
-        image_format: Literal["JPEG", "PNG", "WEBP", "AUTO"] = "PNG",
-        resolution: Literal["FULL", "DISPLAY"] = "DISPLAY",
+        image_format: Literal["JPEG", "PNG", "WEBP", "AUTO"] = "JPEG",
+        resolution: Literal["FULL", "DISPLAY"] = "FULL",
     ) -> Image.Image:
         response = await self.ctx.get_image(state_id=st, image_format=image_format, resolution=resolution)
         return Image.open(io.BytesIO(response))
