@@ -49,9 +49,9 @@ async def process(
     app.logger.debug(f"{stateid_erase=}")
 
     # download output image
-    image_erase = await ctx.call_async.download_pil_image(stateid_erase)
+    pil_erase = await ctx.call_async.download_pil_image(stateid_erase)
 
-    return stateid_erase, image_erase
+    return stateid_erase, pil_erase
 
 
 async def erase(ctx: EditorAPIContext, request: Request) -> Response:

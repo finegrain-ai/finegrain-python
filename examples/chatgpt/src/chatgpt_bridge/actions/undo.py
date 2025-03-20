@@ -31,19 +31,19 @@ async def undo(ctx: EditorAPIContext, request: Request) -> Response:
 
     # download the image
     async with asyncio.TaskGroup() as tg:
-        responses = [
+        responses_undo = [
             tg.create_task(
                 ctx.call_async.download_pil_image(stateid),
             )
             for stateid in input_data.stateids_undo
         ]
-    images = [r.result() for r in responses]
+    pils_undo = [r.result() for r in responses_undo]
 
     # build output response
     output_data = UndoOutput(
         openaiFileResponse=[
             OpenaiFileResponse.from_image(image=image, name=f"undo_{i}")  #
-            for i, image in enumerate(images)
+            for i, image in enumerate(pils_undo)
         ],
         stateids_output=input_data.stateids_undo,
     )

@@ -47,29 +47,29 @@ async def process(
     app.logger.debug(f"{stateid_cutout=}")
 
     # download cutout
-    cutout = await ctx.call_async.download_pil_image(stateid_cutout)
+    pil_cutout = await ctx.call_async.download_pil_image(stateid_cutout)
 
     # paste cutout onto a blank image, with margins
-    cutout_margin = Image.new(
+    pil_cutout_margin = Image.new(
         mode="RGBA",
-        size=(int(1.618 * cutout.width), int(1.618 * cutout.height)),
+        size=(int(1.618 * pil_cutout.width), int(1.618 * pil_cutout.height)),
         color=background_color,
     )
     bbox = (
-        (cutout_margin.width - cutout.width) // 2,
-        (cutout_margin.height - cutout.height) // 2,
-        (cutout_margin.width - cutout.width) // 2 + cutout.width,
-        (cutout_margin.height - cutout.height) // 2 + cutout.height,
+        (pil_cutout_margin.width - pil_cutout.width) // 2,
+        (pil_cutout_margin.height - pil_cutout.height) // 2,
+        (pil_cutout_margin.width - pil_cutout.width) // 2 + pil_cutout.width,
+        (pil_cutout_margin.height - pil_cutout.height) // 2 + pil_cutout.height,
     )
-    cutout_margin.paste(cutout, bbox, cutout)
-    cutout_margin = cutout_margin.convert("RGB")
+    pil_cutout_margin.paste(pil_cutout, bbox, pil_cutout)
+    pil_cutout_margin = pil_cutout_margin.convert("RGB")
 
     # upload the cutout with margin to the API
-    cutout_data = image_to_bytes(cutout_margin)
+    cutout_data = image_to_bytes(pil_cutout_margin)
     stateid_cutout_margin = await ctx.call_async.upload_image(cutout_data)
     app.logger.debug(f"{stateid_cutout_margin=}")
 
-    return stateid_cutout_margin, cutout_margin
+    return stateid_cutout_margin, pil_cutout_margin
 
 
 async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
