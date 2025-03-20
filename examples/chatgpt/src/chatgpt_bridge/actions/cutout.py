@@ -125,7 +125,7 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
                 stateids_input,
                 input_data.prompts,
                 input_data.background_colors,
-                strict=False,
+                strict=True,
             )
         ]
     results_cutout = [r.result() for r in responses_cutout]
