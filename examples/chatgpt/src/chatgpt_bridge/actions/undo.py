@@ -1,3 +1,5 @@
+import asyncio
+
 from finegrain import StateID
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
@@ -28,10 +30,14 @@ async def undo(ctx: EditorAPIContext, request: Request) -> Response:
         raise ValueError("[undo] input error: stateids_undo is required")
 
     # download the image
-    images = [
-        await ctx.call_async.download_pil_image(stateid)  #
-        for stateid in input_data.stateids_undo
-    ]
+    async with asyncio.TaskGroup() as tg:
+        responses = [
+            tg.create_task(
+                ctx.call_async.download_pil_image(stateid),
+            )
+            for stateid in input_data.stateids_undo
+        ]
+    images = [r.result() for r in responses]
 
     # build output response
     output_data = UndoOutput(
