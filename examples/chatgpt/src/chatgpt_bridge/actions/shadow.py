@@ -1,4 +1,7 @@
+import asyncio
+
 from finegrain import ErrorResult, StateID
+from PIL import Image
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
@@ -25,7 +28,7 @@ async def process(
     stateid_input: StateID,
     prompt: str,
     background_color: str,
-) -> StateID:
+) -> tuple[StateID, Image.Image]:
     # call multi_segment
     stateid_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
@@ -63,7 +66,10 @@ async def process(
     stateid_bgcolor = result_bgcolor.state_id
     app.logger.debug(f"{stateid_bgcolor=}")
 
-    return stateid_bgcolor
+    # download output image
+    pil_bgcolor = await ctx.call_async.download_pil_image(stateid_bgcolor)
+
+    return stateid_bgcolor, pil_bgcolor
 
 
 async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
@@ -73,18 +79,13 @@ async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
     input_data = ShadowParams(**input_json)
     app.logger.debug(f"{input_data=}")
 
-    # get stateids_input, or create them from openaiFileIdRefs
+    # validate image input
     if input_data.stateids_input:
-        stateids_input = input_data.stateids_input
+        len_stateids_input = len(input_data.stateids_input)
     elif input_data.openaiFileIdRefs:
-        stateids_input: list[StateID] = []
-        for oai_ref in input_data.openaiFileIdRefs:
-            if oai_ref.download_link:
-                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
-                stateids_input.append(stateid_input)
+        len_stateids_input = len(input_data.openaiFileIdRefs)
     else:
         raise ValueError("[shadow] input error: stateids_input or openaiFileIdRefs is required")
-    app.logger.debug(f"{stateids_input=}")
 
     # validate prompts
     if input_data.prompts is None:
@@ -94,39 +95,48 @@ async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
 
     # validate background_colors
     if input_data.background_colors is None:
-        input_data.background_colors = ["#ffffff"] * len(stateids_input)
-    if len(stateids_input) != len(input_data.background_colors):
+        input_data.background_colors = ["#ffffff"] * len_stateids_input
+    if len_stateids_input != len(input_data.background_colors):
         raise ValueError("[shadow] input error: stateids_input and background_colors must have the same length")
     if any(not color for color in input_data.background_colors):
         raise ValueError("[shadow] input error: all the background colors must be not empty")
 
-    # process the inputs
-    stateids_shadow = [
-        await process(
-            ctx=ctx,
-            stateid_input=stateid_input,
-            prompt=prompt,
-            background_color=background_color,
-        )
-        for stateid_input, prompt, background_color in zip(
-            stateids_input,
-            input_data.prompts,
-            input_data.background_colors,
-            strict=True,
-        )
-    ]
+    # get stateids_input, or create them from openaiFileIdRefs
+    if input_data.stateids_input:
+        stateids_input = input_data.stateids_input
+    elif input_data.openaiFileIdRefs:
+        stateids_input = [await ref.get_stateid(ctx) for ref in input_data.openaiFileIdRefs]
+    else:
+        raise ValueError("[shadow] input error: stateids_input or openaiFileIdRefs is required")
+    app.logger.debug(f"{stateids_input=}")
 
-    # download output images
-    shadow_imgs = [
-        await ctx.call_async.download_pil_image(stateid_shadow)  #
-        for stateid_shadow in stateids_shadow
-    ]
+    # process the inputs
+    async with asyncio.TaskGroup() as tg:
+        responses_shadow = [
+            tg.create_task(
+                process(
+                    ctx=ctx,
+                    stateid_input=stateid_input,
+                    prompt=prompt,
+                    background_color=background_color,
+                )
+            )
+            for stateid_input, prompt, background_color in zip(
+                stateids_input,
+                input_data.prompts,
+                input_data.background_colors,
+                strict=True,
+            )
+        ]
+    results_shadow = [r.result() for r in responses_shadow]
+    stateids_shadow = [r[0] for r in results_shadow]
+    pils_shadow = [r[1] for r in results_shadow]
 
     # build output response
     output_data = ShadowOutput(
         openaiFileResponse=[
             OpenaiFileResponse.from_image(image=shadow_img, name=f"shadow_{i}")
-            for i, shadow_img in enumerate(shadow_imgs)
+            for i, shadow_img in enumerate(pils_shadow)
         ],
         stateids_output=stateids_shadow,
         stateids_undo=stateids_input,
