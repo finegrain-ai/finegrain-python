@@ -6,7 +6,7 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
-from typing import Any, BinaryIO, Literal, NewType, cast, get_args
+from typing import IO, Any, Literal, NewType, cast, get_args
 
 import httpx
 import httpx_sse
@@ -889,13 +889,13 @@ class EditorApiAsyncClient:
     def __init__(self, ctx: EditorAPIContext) -> None:
         self.ctx = ctx
 
-    async def upload_image(self, file: BinaryIO | bytes) -> StateID:
+    async def upload_image(self, file: IO[bytes] | bytes) -> StateID:
         response = await self.ctx.request("POST", "state/upload", files={"file": file})
         return response.json()["state"]
 
     async def _create_state(
         self,
-        file: BinaryIO | bytes | None,
+        file: IO[bytes] | bytes | None,
         file_url: str | None = None,
         meta: dict[str, Any] | None = None,
         timeout: float | None = 30.0,
@@ -953,7 +953,7 @@ class EditorApiAsyncClient:
 
     async def create_state(
         self,
-        file: BinaryIO | bytes | None = None,
+        file: IO[bytes] | bytes | None = None,
         file_url: str | None = None,
         meta: dict[str, Any] | None = None,
         timeout: float | None = 30.0,
