@@ -58,11 +58,11 @@ async def process(
 async def erase(ctx: EditorAPIContext, request: Request) -> Response:
     # get information on the caller
     infos = await ctx.call_async.me()
-    app.logger.debug(f"{infos['uid']} - {infos['credits']} - calling /erase")
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - calling /erase")
 
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"{input_json=}")
+    app.logger.info(f"{input_json=}")
     input_data = EraseParams(**input_json)
     app.logger.debug(f"{input_data=}")
 
@@ -114,7 +114,7 @@ async def erase(ctx: EditorAPIContext, request: Request) -> Response:
 
     # get credits left
     infos = await ctx.call_async.me()
-    app.logger.debug(f"{infos['uid']} - {infos['credits']} - done /erase")
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - done /erase")
 
     # build output response
     data_output = EraseOutput(
@@ -126,6 +126,6 @@ async def erase(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_undo=stateids_input,
         credits_left=infos["credits"],
     )
-    app.logger.debug(f"{data_output=}")
+    app.logger.info(f"{data_output=}")
     output_response = jsonify(data_output.model_dump())
     return output_response

@@ -76,11 +76,11 @@ async def process(
 async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
     # get information on the caller
     infos = await ctx.call_async.me()
-    app.logger.debug(f"{infos['uid']} - {infos['credits']} - calling /cutout")
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - calling /cutout")
 
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"{input_json=}")
+    app.logger.info(f"{input_json=}")
     input_data = CutoutParams(**input_json)
     app.logger.debug(f"{input_data=}")
 
@@ -139,7 +139,7 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
 
     # get infos on the caller
     infos = await ctx.call_async.me()
-    app.logger.debug(f"{infos['uid']} - {infos['credits']} - done /cutout")
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - done /cutout")
 
     # build output response
     output_data = CutoutOutput(
@@ -154,6 +154,6 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_output=stateids_cutout,
         credits_left=infos["credits"],
     )
-    app.logger.debug(f"{output_data=}")
+    app.logger.info(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response

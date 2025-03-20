@@ -74,9 +74,13 @@ async def process(
 
 
 async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
+    # get information on the caller
+    infos = await ctx.call_async.me()
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - calling /shadow")
+
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"{input_json=}")
+    app.logger.info(f"{input_json=}")
     input_data = ShadowParams(**input_json)
     app.logger.debug(f"{input_data=}")
 
@@ -135,7 +139,7 @@ async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
 
     # get credits left
     infos = await ctx.call_async.me()
-    app.logger.debug(f"{infos['uid']} - {infos['credits']} - done /shadow")
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - done /shadow")
 
     # build output response
     output_data = ShadowOutput(
@@ -147,6 +151,6 @@ async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
         stateids_undo=stateids_input,
         credits_left=infos["credits"],
     )
-    app.logger.debug(f"{output_data=}")
+    app.logger.info(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())
     return output_response
