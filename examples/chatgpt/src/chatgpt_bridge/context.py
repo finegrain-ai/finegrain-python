@@ -40,6 +40,7 @@ class EditorApiAsyncClient(_EditorApiAsyncClient):
         detections = result_detect.results
         if len(detections) == 0:
             raise ValueError(f"[MultiSegment] internal detect error: no detection found for prompt {prompt}")
+        detections = detections[:15]  # limit to 15 detections, required by merge-masks
         app.logger.debug(f"{detections=}")
 
         # call segment on each detection
