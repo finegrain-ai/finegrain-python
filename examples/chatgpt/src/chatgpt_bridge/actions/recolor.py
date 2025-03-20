@@ -113,10 +113,13 @@ async def recolor(ctx: EditorAPIContext, request: Request) -> Response:
         raise ValueError("[recolor] input error: all the positive prompts must be not empty")
 
     # validate negative_object_names
-    if input_data.negative_prompts is None:
+    if not input_data.negative_prompts:
         input_data.negative_prompts = [None] * len_stateids_input
-    if len_stateids_input != len(input_data.negative_prompts):
-        raise ValueError("[recolor] input error: stateids_input and negative prompts must have the same length")
+    else:
+        if len_stateids_input != len(input_data.negative_prompts):
+            raise ValueError("[recolor] input error: stateids_input and negative prompts must have the same length")
+        if any(not prompt for prompt in input_data.negative_prompts):
+            raise ValueError("[recolor] input error: all the negative prompts must be not empty")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
