@@ -1,3 +1,5 @@
+import asyncio
+
 from finegrain import ErrorResult, StateID
 from PIL import Image
 from pydantic import BaseModel
@@ -26,7 +28,7 @@ async def process(
     stateid_input: StateID,
     background_color: str,
     prompt: str,
-) -> tuple[Image.Image, StateID]:
+) -> tuple[StateID, Image.Image]:
     # call multi_segment
     stateid_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
@@ -67,7 +69,7 @@ async def process(
     stateid_cutout_margin = await ctx.call_async.upload_image(cutout_data)
     app.logger.debug(f"{stateid_cutout_margin=}")
 
-    return cutout_margin, stateid_cutout_margin
+    return stateid_cutout_margin, cutout_margin
 
 
 async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
@@ -77,48 +79,58 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
     input_data = CutoutParams(**input_json)
     app.logger.debug(f"{input_data=}")
 
-    # get stateids_input, or create them from openaiFileIdRefs
+    # validate image input
     if input_data.stateids_input:
-        stateids_input = input_data.stateids_input
+        len_stateids_input = len(input_data.stateids_input)
     elif input_data.openaiFileIdRefs:
-        stateids_input: list[StateID] = []
-        for oai_ref in input_data.openaiFileIdRefs:
-            if oai_ref.download_link:
-                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
-                stateids_input.append(stateid_input)
+        len_stateids_input = len(input_data.openaiFileIdRefs)
     else:
         raise ValueError("[cutout] input error: stateids_input or openaiFileIdRefs is required")
-    app.logger.debug(f"{stateids_input=}")
 
-    # validate input data
+    # validate prompt input
     if input_data.prompts is None:
         raise ValueError("[cutout] input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
         raise ValueError("[cutout] input error: all the prompts must be not empty")
-    if len(stateids_input) != len(input_data.prompts):
+    if len(input_data.prompts) != len_stateids_input:
         raise ValueError("[cutout] input error: stateids_input and prompts must have the same length")
+
+    # validate background_colors input
     if input_data.background_colors is None:
-        input_data.background_colors = ["#ffffff"] * len(stateids_input)
-    if len(input_data.background_colors) != len(stateids_input):
+        input_data.background_colors = ["#ffffff"] * len_stateids_input
+    if len(input_data.background_colors) != len_stateids_input:
         raise ValueError("[cutout] input error: stateids_input and background_colors must have the same length")
 
+    # get stateids_input, or create them from openaiFileIdRefs
+    if input_data.stateids_input:
+        stateids_input = input_data.stateids_input
+    elif input_data.openaiFileIdRefs:
+        stateids_input = [await ref.get_stateid(ctx) for ref in input_data.openaiFileIdRefs]
+    else:
+        raise ValueError("[cutout] input error: stateids_input or openaiFileIdRefs is required")
+    app.logger.debug(f"{stateids_input=}")
+
     # process the inputs
-    outputs = [
-        await process(
-            ctx=ctx,
-            prompt=prompt,
-            stateid_input=stateid_input,
-            background_color=background_color,
-        )
-        for stateid_input, prompt, background_color in zip(
-            stateids_input,
-            input_data.prompts,
-            input_data.background_colors,
-            strict=True,
-        )
-    ]
-    cutouts = [output[0] for output in outputs]
-    stateids_output = [output[1] for output in outputs]
+    async with asyncio.TaskGroup() as tg:
+        responses_cutout = [
+            tg.create_task(
+                process(
+                    ctx=ctx,
+                    stateid_input=stateid_input,
+                    background_color=background_color,
+                    prompt=prompt,
+                )
+            )
+            for stateid_input, prompt, background_color in zip(
+                stateids_input,
+                input_data.prompts,
+                input_data.background_colors,
+                strict=False,
+            )
+        ]
+    results_cutout = [r.result() for r in responses_cutout]
+    stateids_cutout = [r[0] for r in results_cutout]
+    pils_cutout = [r[1] for r in results_cutout]
 
     # build output response
     output_data = CutoutOutput(
@@ -127,10 +139,10 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
                 image=cutout,
                 name=f"cutout_{i}",
             )
-            for i, cutout in enumerate(cutouts)
+            for i, cutout in enumerate(pils_cutout)
         ],
         stateids_undo=stateids_input,
-        stateids_output=stateids_output,
+        stateids_output=stateids_cutout,
     )
     app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())

@@ -105,13 +105,13 @@ async def erase(ctx: EditorAPIContext, request: Request) -> Response:
         ]
     results_erase = [r.result() for r in responses_erase]
     stateids_erase = [r[0] for r in results_erase]
-    pil_erase = [r[1] for r in results_erase]
+    pils_erase = [r[1] for r in results_erase]
 
     # build output response
     data_output = EraseOutput(
         openaiFileResponse=[
             OpenaiFileResponse.from_image(image=erased_img, name=f"erased_{i}")
-            for i, erased_img in enumerate(pil_erase)
+            for i, erased_img in enumerate(pils_erase)
         ],
         stateids_output=stateids_erase,
         stateids_undo=stateids_input,
