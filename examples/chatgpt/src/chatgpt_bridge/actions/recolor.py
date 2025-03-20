@@ -52,7 +52,7 @@ async def process(
             operation="difference",
         )
         if isinstance(result_mask_difference, ErrorResult):
-            raise ValueError(f"[Recolor] internal merge_masks error: {result_mask_difference.error}")
+            raise ValueError(f"[recolor] internal merge_masks error: {result_mask_difference.error}")
         stateid_mask_difference = result_mask_difference.state_id
     else:
         stateid_mask_difference = stateid_positive_segment
@@ -65,7 +65,7 @@ async def process(
         color=object_color,
     )
     if isinstance(result_recolor, ErrorResult):
-        raise ValueError(f"[Recolor] internal recolor error: {result_recolor.error}")
+        raise ValueError(f"[recolor] internal recolor error: {result_recolor.error}")
     stateid_recolor = result_recolor.state_id
     app.logger.debug(f"{stateid_recolor=}")
 
@@ -89,28 +89,28 @@ async def recolor(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("[Recolor] input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[recolor] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate object_colors
     if input_data.object_colors is None:
-        raise ValueError("[Recolor] input error: object_colors is required")
+        raise ValueError("[recolor] input error: object_colors is required")
     if len(stateids_input) != len(input_data.object_colors):
-        raise ValueError("[Recolor] input error: stateids_input and object_colors must have the same length")
+        raise ValueError("[recolor] input error: stateids_input and object_colors must have the same length")
 
     # validate positive_prompts
     if input_data.positive_prompts is None:
-        raise ValueError("[Recolor] input error: positive_prompts is required")
+        raise ValueError("[recolor] input error: positive_prompts is required")
     if len(stateids_input) != len(input_data.positive_prompts):
-        raise ValueError("[Recolor] input error: stateids_input and positive_prompts must have the same length")
+        raise ValueError("[recolor] input error: stateids_input and positive_prompts must have the same length")
     if any(not prompt for prompt in input_data.positive_prompts):
-        raise ValueError("[Recolor] input error: all the positive prompts must be not empty")
+        raise ValueError("[recolor] input error: all the positive prompts must be not empty")
 
     # validate negative_object_names
     if input_data.negative_prompts is None:
         input_data.negative_prompts = [None] * len(stateids_input)
     if len(stateids_input) != len(input_data.negative_prompts):
-        raise ValueError("[Recolor] input error: stateids_input and negative prompts must have the same length")
+        raise ValueError("[recolor] input error: stateids_input and negative prompts must have the same length")
 
     # process the inputs
     stateids_recolor = [

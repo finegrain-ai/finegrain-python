@@ -40,7 +40,7 @@ async def process(
         mask_state_id=stateid_segment,
     )
     if isinstance(result_cutout, ErrorResult):
-        raise ValueError(f"[Cutout] internal cutout error: {result_cutout.error}")
+        raise ValueError(f"[cutout] internal cutout error: {result_cutout.error}")
     stateid_cutout = result_cutout.state_id
     app.logger.debug(f"{stateid_cutout=}")
 
@@ -87,20 +87,20 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("[Cutout] input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[cutout] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate input data
     if input_data.prompts is None:
-        raise ValueError("[Cutout] input error: prompts is required")
+        raise ValueError("[cutout] input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("[Cutout] input error: all the prompts must be not empty")
+        raise ValueError("[cutout] input error: all the prompts must be not empty")
     if len(stateids_input) != len(input_data.prompts):
-        raise ValueError("[Cutout] input error: stateids_input and prompts must have the same length")
+        raise ValueError("[cutout] input error: stateids_input and prompts must have the same length")
     if input_data.background_colors is None:
         input_data.background_colors = ["#ffffff"] * len(stateids_input)
     if len(input_data.background_colors) != len(stateids_input):
-        raise ValueError("[Cutout] input error: stateids_input and background_colors must have the same length")
+        raise ValueError("[cutout] input error: stateids_input and background_colors must have the same length")
 
     # process the inputs
     outputs = [

@@ -39,7 +39,7 @@ async def process(
         mask_state_id=stateid_segment,
     )
     if isinstance(result_cutout, ErrorResult):
-        raise ValueError(f"Shadow internal cutout error: {result_cutout.error}")
+        raise ValueError(f"[shadow] internal cutout error: {result_cutout.error}")
     stateid_cutout = result_cutout.state_id
     app.logger.debug(f"{stateid_cutout=}")
 
@@ -49,7 +49,7 @@ async def process(
         background="transparent",
     )
     if isinstance(result_shadow, ErrorResult):
-        raise ValueError(f"[Shadow] internal shadow error: {result_shadow.error}")
+        raise ValueError(f"[shadow] internal shadow error: {result_shadow.error}")
     stateid_shadow = result_shadow.state_id
     app.logger.debug(f"{stateid_shadow=}")
 
@@ -59,7 +59,7 @@ async def process(
         background=background_color,
     )
     if isinstance(result_bgcolor, ErrorResult):
-        raise ValueError(f"[Shadow] internal set_background_color error: {result_bgcolor.error}")
+        raise ValueError(f"[shadow] internal set_background_color error: {result_bgcolor.error}")
     stateid_bgcolor = result_bgcolor.state_id
     app.logger.debug(f"{stateid_bgcolor=}")
 
@@ -83,22 +83,22 @@ async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
                 stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
                 stateids_input.append(stateid_input)
     else:
-        raise ValueError("[Shadow] input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[shadow] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # validate prompts
     if input_data.prompts is None:
-        raise ValueError("[Shadow] input error: prompts is required")
+        raise ValueError("[shadow] input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("[Shadow] input error: all the prompts must be not empty")
+        raise ValueError("[shadow] input error: all the prompts must be not empty")
 
     # validate background_colors
     if input_data.background_colors is None:
         input_data.background_colors = ["#ffffff"] * len(stateids_input)
     if len(stateids_input) != len(input_data.background_colors):
-        raise ValueError("[Shadow] input error: stateids_input and background_colors must have the same length")
+        raise ValueError("[shadow] input error: stateids_input and background_colors must have the same length")
     if any(not color for color in input_data.background_colors):
-        raise ValueError("[Shadow] input error: all the background colors must be not empty")
+        raise ValueError("[shadow] input error: all the background colors must be not empty")
 
     # process the inputs
     stateids_shadow = [

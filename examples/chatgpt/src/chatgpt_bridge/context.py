@@ -36,10 +36,10 @@ class EditorApiAsyncClient(_EditorApiAsyncClient):
             prompt=prompt,
         )
         if isinstance(result_detect, ErrorResult):
-            raise ValueError(f"[MultiSegment] internal detect error: {result_detect.error}")
+            raise ValueError(f"[multi_segment] internal detect error: {result_detect.error}")
         detections = result_detect.results
         if len(detections) == 0:
-            raise ValueError(f"[MultiSegment] internal detect error: no detection found for prompt {prompt}")
+            raise ValueError(f"[multi_segment] internal detect error: no detection found for prompt {prompt}")
         detections = detections[:15]  # limit to 15 detections, required by merge-masks
         app.logger.debug(f"{detections=}")
 
@@ -60,7 +60,7 @@ class EditorApiAsyncClient(_EditorApiAsyncClient):
             raise RuntimeError(err.error)
         stateids_segment = [r.state_id for r in results_segment]
         if len(stateids_segment) == 0:
-            raise ValueError("[MultiSegment] internal segment error: no segmentation found")
+            raise ValueError("[multi_segment] internal segment error: no segmentation found")
         app.logger.debug(f"{stateids_segment=}")
 
         # call merge-masks
@@ -72,7 +72,7 @@ class EditorApiAsyncClient(_EditorApiAsyncClient):
                 operation="union",
             )
             if isinstance(result_mask_union, ErrorResult):
-                raise ValueError(f"[MultiSegment] internal merge_masks error: {result_mask_union.error}")
+                raise ValueError(f"[multi_segment] internal merge_masks error: {result_mask_union.error}")
             stateid_mask_union = result_mask_union.state_id
         app.logger.debug(f"{stateid_mask_union=}")
 

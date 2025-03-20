@@ -25,7 +25,7 @@ async def undo(ctx: EditorAPIContext, request: Request) -> Response:
 
     # validate input data
     if not input_data.stateids_undo:
-        raise ValueError("Undo input error: stateids_undo is required")
+        raise ValueError("[undo] input error: stateids_undo is required")
 
     # download the image
     images = [

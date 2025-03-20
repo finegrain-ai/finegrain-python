@@ -44,7 +44,7 @@ async def process(
         mode=mode,
     )
     if isinstance(result_erase, ErrorResult):
-        raise ValueError(f"[Erase] internal erase error: {result_erase.error}")
+        raise ValueError(f"[erase] internal erase error: {result_erase.error}")
     stateid_erase = result_erase.state_id
     app.logger.debug(f"{stateid_erase=}")
 
@@ -67,19 +67,19 @@ async def erase(ctx: EditorAPIContext, request: Request) -> Response:
     elif input_data.openaiFileIdRefs:
         len_stateids_input = len(input_data.openaiFileIdRefs)
     else:
-        raise ValueError("[Erase] input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[erase] input error: stateids_input or openaiFileIdRefs is required")
 
     # validate prompt input
     if input_data.prompts is None:
-        raise ValueError("[Erase] input error: prompts is required")
+        raise ValueError("[erase] input error: prompts is required")
     if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("[Erase] input error: all the prompts must be not empty")
+        raise ValueError("[erase] input error: all the prompts must be not empty")
     if len(input_data.prompts) != len_stateids_input:
-        raise ValueError("[Erase] input error: stateids_input and prompts must have the same length")
+        raise ValueError("[erase] input error: stateids_input and prompts must have the same length")
 
     # validate mode input
     if input_data.mode not in get_args(Mode):
-        raise ValueError("[Erase] input error: invalid mode")
+        raise ValueError("[erase] input error: invalid mode")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
@@ -87,7 +87,7 @@ async def erase(ctx: EditorAPIContext, request: Request) -> Response:
     elif input_data.openaiFileIdRefs:
         stateids_input = [await ref.get_stateid(ctx) for ref in input_data.openaiFileIdRefs]
     else:
-        raise ValueError("[Erase] input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[erase] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
     # process the inputs
