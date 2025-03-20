@@ -32,10 +32,10 @@ paths:
                   description: The (verbatim) last message sent by the user, that triggered this action
                 prompts:
                   type: array
-                  description: List of prompts describing which objects to cutout in each image.
-                    One prompt per image, a prompt can include multiple comma seperated objects.
+                  description: List of prompts associated with each image
                   items:
                     type: string
+                    description: A comma separated list of objects to cutout, NO plural form
                 background_colors:
                   type: array
                   description: List of hex colors (#rrggbb) to fill the background of each image with
@@ -111,10 +111,10 @@ paths:
                   description: The API output quality mode use ("standard" or "premium")
                 prompts:
                   type: array
-                  description: List of prompts describing which objects to erase in the associated image.
-                    One prompt per image, a prompt can include multiple comma seperated objects.
+                  description: List of prompts associated with each image
                   items:
                     type: string
+                    description: A comma separated list of objects to erase, NO plural form
                 openaiFileIdRefs:
                   type: array
                   description: List of images to process, uploaded by the user
@@ -182,16 +182,16 @@ paths:
                   description: The (verbatim) last message sent by the user, that triggered this action
                 positive_prompts:
                   type: array
-                  description: List of prompts describing all the objects to recolor in the associated image.
-                    One prompt per image, a prompt can include multiple comma seperated objects.
+                  description: List of positive prompts associated with each image
                   items:
                     type: string
+                    description: A comma separated list of objects to recolor, NO plural form
                 negative_prompts:
                   type: array
-                  description: List of prompts describing all the objects to NOT recolor in the associated image, explicitely specified by the user.
-                    One prompt per image, a prompt can include multiple comma seperated objects.
+                  description: List of negative prompts associated with each image
                   items:
                     type: string
+                    description: A comma separated list of objects to NOT recolor, explicitly mentioned by the user, NO plural form
                 object_colors:
                   type: array
                   description: List of hex colors (#rrggbb) to recolor the positive objects to
@@ -264,10 +264,10 @@ paths:
                   description: The (verbatim) last message sent by the user, that triggered this action
                 prompts:
                   type: array
-                  description: List of prompts describing the object to create a shadow packshot for.
-                    One prompt per image, a prompt can include multiple comma seperated objects.
+                  description: List of prompts associated with each image
                   items:
                     type: string
+                    description: A comma separated list of objects to create a shadow packshot for, NO plural form
                 background_colors:
                   type: array
                   description: List of hex colors (#rrggbb) to fill the background with
@@ -315,54 +315,5 @@ paths:
                   stateids_undo:
                     type: array
                     description: The state ids of the input images, useful to undo edits
-                    items:
-                      type: string
-  /undo:
-    post:
-      operationId: undo
-      x-openai-isConsequential: false
-      summary: Utility endpoint to get images from stateids, useful undo or revert to the input images of a previous edit
-      description: The user references stateids. The API returns the previous images, and stateids referencing the previous images.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                user_message:
-                  type: string
-                  description: The (verbatim) last message sent by the user, that triggered this action
-                stateids_undo:
-                  type: array
-                  description: List of API stateids to undo, filled from previous stateids_undo
-                  items:
-                    type: string
-      responses:
-        "200":
-          description: Image retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  openaiFileResponse:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        name:
-                          type: string
-                          description: The filename of the image
-                        mime_type:
-                          type: string
-                          description: The MIME type of the image
-                        content:
-                          type: string
-                          format: byte
-                          description: The base64 encoded previous image content
-                  stateids_output:
-                    type: array
-                    description: The state ids of the previous images, useful to chain edits
                     items:
                       type: string

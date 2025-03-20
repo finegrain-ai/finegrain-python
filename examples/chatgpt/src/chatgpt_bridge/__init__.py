@@ -6,7 +6,6 @@ from chatgpt_bridge.actions.cutout import cutout
 from chatgpt_bridge.actions.erase import erase
 from chatgpt_bridge.actions.recolor import recolor
 from chatgpt_bridge.actions.shadow import shadow
-from chatgpt_bridge.actions.undo import undo
 from chatgpt_bridge.env import APP_LOGLEVEL, FG_API_PRIORITY, FG_API_TIMEOUT, FG_API_URL, LOGLEVEL, USER_AGENT
 from chatgpt_bridge.utils import get_ctx, json_error
 
@@ -73,9 +72,3 @@ async def _recolor() -> Response:
 async def _shadow() -> Response:
     async with get_ctx() as ctx:
         return await shadow(ctx, request)
-
-
-@app.post("/undo")
-async def _undo() -> Response:
-    async with get_ctx() as ctx:
-        return await undo(ctx, request)
