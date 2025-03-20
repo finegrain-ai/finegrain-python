@@ -1,4 +1,6 @@
-from finegrain import ErrorResult, StateID
+from typing import get_args
+
+from finegrain import ErrorResult, Mode, StateID
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
@@ -11,6 +13,7 @@ class EraseParams(BaseModel):
     openaiFileIdRefs: list[OpenaiFileIdRef] | None = None  # noqa: N815
     stateids_input: list[StateID] | None = None
     prompts: list[str] | None = None
+    mode: Mode = "standard"
 
 
 class EraseOutput(BaseModel):
@@ -23,6 +26,7 @@ async def process(
     ctx: EditorAPIContext,
     stateid_input: StateID,
     prompt: str,
+    mode: Mode,
 ) -> StateID:
     # call multi_segment
     stateid_segment = await ctx.call_async.multi_segment(
@@ -35,7 +39,7 @@ async def process(
     result_erase = await ctx.call_async.erase(
         image_state_id=stateid_input,
         mask_state_id=stateid_segment,
-        mode="express",
+        mode=mode,
     )
     if isinstance(result_erase, ErrorResult):
         raise ValueError(f"[Erase] internal erase error: {result_erase.error}")
@@ -72,10 +76,12 @@ async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
         raise ValueError("[Erase] input error: all the prompts must be not empty")
     if len(stateids_input) != len(input_data.prompts):
         raise ValueError("[Erase] input error: stateids_input and prompts must have the same length")
+    if input_data.mode not in get_args(Mode):
+        raise ValueError("[Erase] input error: invalid mode")
 
     # process the inputs
     stateids_erased = [
-        await process(ctx, stateid_input, prompt)
+        await process(ctx, stateid_input, prompt, input_data.mode)
         for stateid_input, prompt in zip(stateids_input, input_data.prompts, strict=True)
     ]
     app.logger.debug(f"{stateids_erased=}")

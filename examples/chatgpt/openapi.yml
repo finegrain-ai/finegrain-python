@@ -106,6 +106,9 @@ paths:
                 user_message:
                   type: string
                   description: The (verbatim) last message sent by the user, that triggered this action
+                mode:
+                  type: string
+                  description: The API output quality mode use ("standard" or "premium")
                 prompts:
                   type: array
                   description: List of prompts describing which objects to erase in the associated image. One prompt per image, a prompt
