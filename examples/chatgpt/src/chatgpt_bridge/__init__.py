@@ -20,11 +20,6 @@ app.logger.info(f"{FG_API_PRIORITY=}")
 app.logger.info(f"{USER_AGENT=}")
 
 
-@app.before_request
-async def log_request() -> None:
-    app.logger.debug(f"Incoming request: {request.method} {request.path}")
-
-
 @app.errorhandler(RuntimeError)
 async def handle_runtime_error(error: RuntimeError) -> Response:
     app.logger.error(f"{error=}")

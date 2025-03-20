@@ -85,6 +85,9 @@ paths:
                     description: The state ids of the input images, useful to undo edits
                     items:
                       type: string
+                  credits_left:
+                    type: integer
+                    description: The number of credits left in the user's account
   /erase:
     post:
       operationId: erase
@@ -158,6 +161,9 @@ paths:
                     description: The state ids of the input images, useful to undo edits
                     items:
                       type: string
+                  credits_left:
+                    type: integer
+                    description: The number of credits left in the user's account
   /recolor:
     post:
       operationId: recolor
@@ -240,6 +246,9 @@ paths:
                     description: The state ids of the input images, useful to undo edits
                     items:
                       type: string
+                  credits_left:
+                    type: integer
+                    description: The number of credits left in the user's account
   /shadow:
     post:
       operationId: shadow
@@ -317,3 +326,6 @@ paths:
                     description: The state ids of the input images, useful to undo edits
                     items:
                       type: string
+                  credits_left:
+                    type: integer
+                    description: The number of credits left in the user's account

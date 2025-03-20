@@ -21,6 +21,7 @@ class ShadowOutput(BaseModel):
     openaiFileResponse: list[OpenaiFileResponse]  # noqa: N815
     stateids_output: list[StateID]
     stateids_undo: list[StateID]
+    credits_left: int
 
 
 async def process(
@@ -132,6 +133,10 @@ async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
     stateids_shadow = [r[0] for r in results_shadow]
     pils_shadow = [r[1] for r in results_shadow]
 
+    # get credits left
+    infos = await ctx.call_async.me()
+    app.logger.debug(f"{infos['uid']} - {infos['credits']} - done /shadow")
+
     # build output response
     output_data = ShadowOutput(
         openaiFileResponse=[
@@ -140,6 +145,7 @@ async def shadow(ctx: EditorAPIContext, request: Request) -> Response:
         ],
         stateids_output=stateids_shadow,
         stateids_undo=stateids_input,
+        credits_left=infos["credits"],
     )
     app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())

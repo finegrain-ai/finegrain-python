@@ -21,6 +21,7 @@ class CutoutOutput(BaseModel):
     openaiFileResponse: list[OpenaiFileResponse]  # noqa: N815
     stateids_undo: list[StateID]
     stateids_output: list[StateID]
+    credits_left: int
 
 
 async def process(
@@ -73,6 +74,10 @@ async def process(
 
 
 async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
+    # get information on the caller
+    infos = await ctx.call_async.me()
+    app.logger.debug(f"{infos['uid']} - {infos['credits']} - calling /cutout")
+
     # parse input data
     input_json = await request.get_json()
     app.logger.debug(f"{input_json=}")
@@ -132,6 +137,10 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
     stateids_cutout = [r[0] for r in results_cutout]
     pils_cutout = [r[1] for r in results_cutout]
 
+    # get infos on the caller
+    infos = await ctx.call_async.me()
+    app.logger.debug(f"{infos['uid']} - {infos['credits']} - done /cutout")
+
     # build output response
     output_data = CutoutOutput(
         openaiFileResponse=[
@@ -143,6 +152,7 @@ async def cutout(ctx: EditorAPIContext, request: Request) -> Response:
         ],
         stateids_undo=stateids_input,
         stateids_output=stateids_cutout,
+        credits_left=infos["credits"],
     )
     app.logger.debug(f"{output_data=}")
     output_response = jsonify(output_data.model_dump())

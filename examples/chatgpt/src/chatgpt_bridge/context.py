@@ -1,6 +1,6 @@
 import asyncio
 import io
-from typing import Literal
+from typing import Any, Literal
 
 from finegrain import EditorApiAsyncClient as _EditorApiAsyncClient
 from finegrain import EditorAPIContext as _EditorAPIContext
@@ -10,6 +10,10 @@ from quart import current_app as app
 
 
 class EditorApiAsyncClient(_EditorApiAsyncClient):
+    async def me(self) -> dict[str, Any]:
+        response = await self.ctx.request(method="GET", url="auth/me")
+        return response.json()
+
     async def upload_link_image(self, url: str) -> StateID:
         result_create = await self.create_state(file_url=url)
         if isinstance(result_create, ErrorResult):
