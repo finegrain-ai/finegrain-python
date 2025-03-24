@@ -15,7 +15,7 @@ class EraseParams(BaseModel):
     openaiFileIdRefs: list[OpenaiFileIdRef] | None = None  # noqa: N815
     stateids_input: list[StateID] | None = None
     prompts: list[str] | None = None
-    mode: Mode = "standard"
+    mode: Mode = "premium"
 
 
 class EraseOutput(BaseModel):

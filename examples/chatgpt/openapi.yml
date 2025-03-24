@@ -111,7 +111,7 @@ paths:
                   description: The (verbatim) last message sent by the user, that triggered this action
                 mode:
                   type: string
-                  description: The API output quality mode use ("standard" or "premium")
+                  description: The API output quality mode use ("premium" or "standard")
                 prompts:
                   type: array
                   description: List of prompts associated with each image
