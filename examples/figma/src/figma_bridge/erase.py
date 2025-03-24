@@ -79,7 +79,7 @@ async def erase(request: Request) -> Response:
                 state_ids=stateids_segment,
                 operation="union",
             )
-            assert not isinstance(result_merge, ErrorResult), f"Mergin segmentations failed: {result_merge.error}"
+            assert not isinstance(result_merge, ErrorResult), f"Merging segmentations failed: {result_merge.error}"
             stateid_merge = result_merge.state_id
         app.logger.debug(f"{stateid_merge=}")
 
