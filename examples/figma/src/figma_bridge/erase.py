@@ -19,8 +19,6 @@ async def erase(request: Request) -> Response:
     prompt = input_form.get("prompt")
     image = input_files.get("image")
 
-    app.logger.debug(f"{input_form=}")
-
     # validate api_key input
     assert api_key, "Missing 'api_key' field"
     assert isinstance(api_key, str), "Invalid 'api_key' field"
