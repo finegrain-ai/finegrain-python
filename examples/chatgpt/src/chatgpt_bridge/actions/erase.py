@@ -1,4 +1,8 @@
-from finegrain import ErrorResult, StateID
+import asyncio
+from typing import get_args
+
+from finegrain import ErrorResult, Mode, StateID
+from PIL import Image
 from pydantic import BaseModel
 from quart import Request, Response, jsonify
 from quart import current_app as app
@@ -11,19 +15,22 @@ class EraseParams(BaseModel):
     openaiFileIdRefs: list[OpenaiFileIdRef] | None = None  # noqa: N815
     stateids_input: list[StateID] | None = None
     prompts: list[str] | None = None
+    mode: Mode = "premium"
 
 
 class EraseOutput(BaseModel):
     openaiFileResponse: list[OpenaiFileResponse]  # noqa: N815
     stateids_output: list[StateID]
     stateids_undo: list[StateID]
+    credits_left: int
 
 
 async def process(
     ctx: EditorAPIContext,
     stateid_input: StateID,
     prompt: str,
-) -> StateID:
+    mode: Mode,
+) -> tuple[StateID, Image.Image]:
     # call multi_segment
     stateid_segment = await ctx.call_async.multi_segment(
         state_id=stateid_input,
@@ -35,66 +42,90 @@ async def process(
     result_erase = await ctx.call_async.erase(
         image_state_id=stateid_input,
         mask_state_id=stateid_segment,
-        mode="express",
+        mode=mode,
     )
     if isinstance(result_erase, ErrorResult):
-        raise ValueError(f"[Erase] internal erase error: {result_erase.error}")
+        raise ValueError(f"[erase] internal erase error: {result_erase.error}")
     stateid_erase = result_erase.state_id
     app.logger.debug(f"{stateid_erase=}")
 
-    return stateid_erase
+    # download output image
+    pil_erase = await ctx.call_async.download_pil_image(stateid_erase)
+
+    return stateid_erase, pil_erase
 
 
-async def _eraser(ctx: EditorAPIContext, request: Request) -> Response:
+async def erase(ctx: EditorAPIContext, request: Request) -> Response:
+    # get information on the caller
+    infos = await ctx.call_async.me()
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - calling /erase")
+
     # parse input data
     input_json = await request.get_json()
-    app.logger.debug(f"{input_json=}")
+    app.logger.info(f"{input_json=}")
     input_data = EraseParams(**input_json)
     app.logger.debug(f"{input_data=}")
+
+    # validate image input
+    if input_data.stateids_input:
+        len_stateids_input = len(input_data.stateids_input)
+    elif input_data.openaiFileIdRefs:
+        len_stateids_input = len(input_data.openaiFileIdRefs)
+    else:
+        raise ValueError("[erase] input error: stateids_input or openaiFileIdRefs is required")
+
+    # validate prompt input
+    if input_data.prompts is None:
+        raise ValueError("[erase] input error: prompts is required")
+    if any(not prompt for prompt in input_data.prompts):
+        raise ValueError("[erase] input error: all the prompts must be not empty")
+    if len(input_data.prompts) != len_stateids_input:
+        raise ValueError("[erase] input error: stateids_input and prompts must have the same length")
+
+    # validate mode input
+    if input_data.mode not in get_args(Mode):
+        raise ValueError("[erase] input error: invalid mode")
 
     # get stateids_input, or create them from openaiFileIdRefs
     if input_data.stateids_input:
         stateids_input = input_data.stateids_input
     elif input_data.openaiFileIdRefs:
-        stateids_input: list[StateID] = []
-        for oai_ref in input_data.openaiFileIdRefs:
-            if oai_ref.download_link:
-                stateid_input = await ctx.call_async.upload_link_image(oai_ref.download_link)
-                stateids_input.append(stateid_input)
+        stateids_input = [await ref.get_stateid(ctx) for ref in input_data.openaiFileIdRefs]
     else:
-        raise ValueError("[Erase] input error: stateids_input or openaiFileIdRefs is required")
+        raise ValueError("[erase] input error: stateids_input or openaiFileIdRefs is required")
     app.logger.debug(f"{stateids_input=}")
 
-    # validate the inputs
-    if input_data.prompts is None:
-        raise ValueError("[Erase] input error: prompts is required")
-    if any(not prompt for prompt in input_data.prompts):
-        raise ValueError("[Erase] input error: all the prompts must be not empty")
-    if len(stateids_input) != len(input_data.prompts):
-        raise ValueError("[Erase] input error: stateids_input and prompts must have the same length")
-
     # process the inputs
-    stateids_erased = [
-        await process(ctx, stateid_input, prompt)
-        for stateid_input, prompt in zip(stateids_input, input_data.prompts, strict=True)
-    ]
-    app.logger.debug(f"{stateids_erased=}")
+    async with asyncio.TaskGroup() as tg:
+        responses_erase = [
+            tg.create_task(
+                process(
+                    ctx=ctx,
+                    stateid_input=stateid_input,
+                    prompt=prompt,
+                    mode=input_data.mode,
+                )
+            )
+            for stateid_input, prompt in zip(stateids_input, input_data.prompts, strict=True)
+        ]
+    results_erase = [r.result() for r in responses_erase]
+    stateids_erase = [r[0] for r in results_erase]
+    pils_erase = [r[1] for r in results_erase]
 
-    # download images from API
-    pil_outputs = [
-        await ctx.call_async.download_pil_image(stateid_erased_img)  #
-        for stateid_erased_img in stateids_erased
-    ]
+    # get credits left
+    infos = await ctx.call_async.me()
+    app.logger.info(f"{infos['uid']} - {infos['credits']} - done /erase")
 
     # build output response
     data_output = EraseOutput(
         openaiFileResponse=[
             OpenaiFileResponse.from_image(image=erased_img, name=f"erased_{i}")
-            for i, erased_img in enumerate(pil_outputs)
+            for i, erased_img in enumerate(pils_erase)
         ],
-        stateids_output=stateids_erased,
+        stateids_output=stateids_erase,
         stateids_undo=stateids_input,
+        credits_left=infos["credits"],
     )
-    app.logger.debug(f"{data_output=}")
+    app.logger.info(f"{data_output=}")
     output_response = jsonify(data_output.model_dump())
     return output_response
