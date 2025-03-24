@@ -99,5 +99,6 @@ async def erase(request: Request) -> Response:
         )
 
     # build output response
-    output_response = Response(response=data_erase, content_type="image/jpeg")
+    content_type = f"image/{image_format.lower()}"
+    output_response = Response(response=data_erase, content_type=content_type)
     return output_response
