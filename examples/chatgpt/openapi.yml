@@ -35,7 +35,7 @@ paths:
                   description: List of prompts associated with each image
                   items:
                     type: string
-                    description: A comma seperated string of objects to cutout, no plural
+                    description: A comma separated string of objects to cutout, no plural
                 background_colors:
                   type: array
                   description: List of hex colors (#rrggbb) to fill the background of each image with
@@ -117,7 +117,7 @@ paths:
                   description: List of prompts associated with each image
                   items:
                     type: string
-                    description: A comma seperated string of objects to erase, no plural
+                    description: A comma separated string of objects to erase, no plural
                 openaiFileIdRefs:
                   type: array
                   description: List of images to process, uploaded by the user
@@ -191,13 +191,13 @@ paths:
                   description: List of positive prompts associated with each image
                   items:
                     type: string
-                    description: A comma seperated string of objects to recolor, no plural
+                    description: A comma separated string of objects to recolor, no plural
                 negative_prompts:
                   type: array
                   description: List of negative prompts associated with each image
                   items:
                     type: string
-                    description: A comma seperated string of objects to NOT recolor, explicitly mentioned by the user, no plural
+                    description: A comma separated string of objects to NOT recolor, explicitly mentioned by the user, no plural
                 object_colors:
                   type: array
                   description: List of hex colors (#rrggbb) to recolor the positive objects to
@@ -276,7 +276,7 @@ paths:
                   description: List of prompts associated with each image
                   items:
                     type: string
-                    description: A comma seperated string of objects to create a shadow packshot for, no plural
+                    description: A comma separated string of objects to create a shadow packshot for, no plural
                 background_colors:
                   type: array
                   description: List of hex colors (#rrggbb) to fill the background with
