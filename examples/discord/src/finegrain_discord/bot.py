@@ -50,6 +50,11 @@ class ObjectNotFoundError(app_commands.AppCommandError):
         self.prompt = prompt
 
 
+class BadQualityMaskError(app_commands.AppCommandError):
+    def __init__(self, prompt: str) -> None:
+        self.prompt = prompt
+
+
 class TooLargeOutputError(app_commands.AppCommandError):
     def __init__(self, actual_size: int, max_size: int) -> None:
         self.actual_size = actual_size
@@ -146,6 +151,27 @@ def _get_max_upload_size(interaction: discord.Interaction) -> int | None:
     return guild.filesize_limit if guild is not None else None
 
 
+async def _call_segment(
+    api_ctx: EditorAPIContext,
+    image: BotImage,
+    prompt: str,
+) -> tuple[StateID, StateID]:
+    with BytesIO() as f:
+        f.write(image.data)
+        st_input = await api_ctx.call_async.upload_image(f)
+
+    segment_r = await api_ctx.call_async.segment(st_input, prompt=prompt, mask_quality="low")
+    if isinstance(segment_r, ErrorResult):
+        if segment_r.error.startswith("could not identify objects to segment"):
+            raise ObjectNotFoundError(prompt=prompt)
+        elif segment_r.error.startswith("could not infer a reliable mask"):
+            raise BadQualityMaskError(prompt=prompt)
+        else:
+            raise RuntimeError(segment_r.error)
+
+    return st_input, segment_r.state_id
+
+
 async def _call_multi_segment(
     api_ctx: EditorAPIContext,
     image: BotImage,
@@ -182,8 +208,8 @@ async def _call_multi_segment(
 
 async def _call_object_eraser(
     api_ctx: EditorAPIContext, image: BotImage, prompt: str, mode: Literal["express", "standard", "premium"] = "premium"
-) -> tuple[BotImage, DetectResult]:
-    st_input, st_mask, detect_result = await _call_multi_segment(api_ctx, image, prompt)
+) -> BotImage:
+    st_input, st_mask = await _call_segment(api_ctx, image, prompt)
     erase_r = await api_ctx.call_async.erase(st_input, st_mask, mode=mode)
     assert not is_error(erase_r)
     image_bytes = await api_ctx.get_image(erase_r.state_id, image_format="JPEG")
@@ -193,11 +219,11 @@ async def _call_object_eraser(
         data=image_bytes,
         width=erase_r.image_size[0],
         height=erase_r.image_size[1],
-    ), detect_result
+    )
 
 
-async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> tuple[BotImage, DetectResult]:
-    st_input, st_mask, detect_result = await _call_multi_segment(api_ctx, image, prompt)
+async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt: str) -> BotImage:
+    st_input, st_mask, _ = await _call_multi_segment(api_ctx, image, prompt)  # needed for high quality masks
     cutout_r = await api_ctx.call_async.cutout(st_input, st_mask)
     assert not is_error(cutout_r)
     cutout_bytes = await api_ctx.get_image(cutout_r.state_id, image_format="PNG")
@@ -221,7 +247,7 @@ async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt
             data=f.getvalue(),
             width=output_size[0],
             height=output_size[1],
-        ), detect_result
+        )
 
 
 async def _load_attached_image(attachment: discord.Attachment) -> BotImage:
@@ -287,7 +313,7 @@ async def erase(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image, _ = await _call_object_eraser(bot.api_ctx, input_image, prompt)
+    output_image = await _call_object_eraser(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
     reply = f"\N{SPONGE} Before/After for prompt '{prompt}':"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
@@ -309,7 +335,7 @@ async def extract(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image, _ = await _call_object_cutter(bot.api_ctx, input_image, prompt)
+    output_image = await _call_object_cutter(bot.api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
     reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}':"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
@@ -339,6 +365,11 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
         reply = (
             f"Oops! Cannot send the output images because they are too large \N{NO ENTRY SIGN}. "
             f"Maximum allowed size is {error.max_size_mb}, but the output size is {error.actual_size_mb}."
+        )
+    elif isinstance(error, BadQualityMaskError):
+        reply = (
+            f"Oops! Could not reliably segment the object(s) in the image based on the prompt '{error.prompt}' "
+            "\N{CONFUSED FACE}. "
         )
     else:
         reply = "Oops! Something went wrong \N{CONFUSED FACE}. Give it another try in a bit!"
