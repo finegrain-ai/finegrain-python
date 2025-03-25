@@ -584,6 +584,7 @@ Trinary = Literal["yes", "no", "unknown"]
 Size2D = tuple[int, int]
 BoundingBox = tuple[int, int, int, int]
 Mode = Literal["express", "standard", "premium"]
+MaskQuality = Literal["low", "high"]
 
 
 def _size2d(v: Any) -> Size2D:
@@ -1030,12 +1031,18 @@ class EditorApiAsyncClient:
         self,
         state_id: StateID,
         bbox: BoundingBox | None = None,
+        prompt: str | None = None,
+        mask_quality: MaskQuality | None = None,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> SegmentResult | ErrorResult:
         params: dict[str, Any] = {}
         if bbox is not None:
             params["bbox"] = list(bbox)
+        if prompt is not None:
+            params["prompt"] = prompt
+        if mask_quality is not None:
+            params["mask_quality"] = mask_quality
         st, ok = await self.ctx.call_skill(f"segment/{state_id}", params, timeout=timeout)
         if with_image:
             image_params = None if isinstance(with_image, bool) else with_image
