@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from io import BytesIO
 from textwrap import dedent
@@ -27,12 +28,14 @@ with env.prefixed("FG_"):
 LOGLEVEL = env.str("LOGLEVEL", "INFO").upper()
 LOGLEVEL_INT: int = logging.getLevelNamesMapping().get(LOGLEVEL, logging.INFO)
 
+assert API_KEY is not None
 assert DISCORD_GUILD_ID is not None
 DISCORD_GUILD = discord.Object(id=DISCORD_GUILD_ID)  # aka "server" in the Discord UI
 
 API_KEY_PATTERN = re.compile(r"^FGAPI(\-[A-Z0-9]{6}){4}$")
 ALLOWED_IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp")
 API_PRIORITY: Priority = "standard"
+USER_AGENT = "finegrain-discord-bot"
 SCISSORS_EMOJI = "\u2702\ufe0f"
 
 
@@ -44,6 +47,24 @@ def is_error(result: Any) -> TypeIs[ErrorResult]:
     if isinstance(result, ErrorResult):
         raise RuntimeError(result.error)
     return False
+
+
+@asynccontextmanager
+async def get_api_ctx(api_key: str):
+    api_ctx = EditorAPIContext(
+        api_key=api_key,
+        base_url=API_URL,
+        priority=API_PRIORITY,
+        user_agent=USER_AGENT,
+    )
+
+    await api_ctx.login()
+    await api_ctx.sse_start()
+
+    yield api_ctx
+
+    await api_ctx.sse_stop()
+    api_ctx.token = None  # clear token obtained during login in case of reuse
 
 
 class UserInputError(app_commands.AppCommandError):
@@ -75,34 +96,21 @@ class TooLargeOutputError(app_commands.AppCommandError):
 
 
 class FinegrainBot(discord.Client):
-    def __init__(self, api_ctx: EditorAPIContext, *, intents: discord.Intents):
+    def __init__(self, api_key: str, *, intents: discord.Intents):
         super().__init__(intents=intents)
+        self.api_key = api_key
         self.tree = app_commands.CommandTree(self)
-        self.api_ctx = api_ctx
 
     async def setup_hook(self):
         self.tree.copy_global_to(guild=DISCORD_GUILD)
         await self.tree.sync(guild=DISCORD_GUILD)
-        await self.api_ctx.login()
-        await self.api_ctx.sse_start()
-
-    async def close(self) -> None:
-        await self.api_ctx.sse_stop()
-        await super().close()
 
 
 intents = Intents.default()
 intents.message_content = True
 
 assert is_api_key_valid(API_KEY), f"invalid API key: {API_KEY}"
-api_ctx = EditorAPIContext(
-    base_url=API_URL,
-    api_key=API_KEY,
-    priority=API_PRIORITY,
-    verify=API_VERIFY,
-    user_agent="finegrain-discord-bot",
-)
-bot = FinegrainBot(api_ctx, intents=intents)
+bot = FinegrainBot(API_KEY, intents=intents)
 
 _log = logging.getLogger(__name__)
 
@@ -316,7 +324,8 @@ async def erase(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image = await _call_object_eraser(bot.api_ctx, input_image, prompt)
+    async with get_api_ctx(bot.api_key) as api_ctx:
+        output_image = await _call_object_eraser(api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
     reply = f"\N{SPONGE} Before/After for prompt '{prompt}':"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
@@ -338,7 +347,8 @@ async def extract(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    output_image = await _call_object_cutter(bot.api_ctx, input_image, prompt)
+    async with get_api_ctx(bot.api_key) as api_ctx:
+        output_image = await _call_object_cutter(api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
     reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}':"
     before_after = _safe_before_after(input_image, output_image, _get_max_upload_size(interaction))
