@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from io import BytesIO
@@ -24,6 +25,7 @@ with env.prefixed("DISCORD_"):
 with env.prefixed("FG_"):
     API_URL: str = str(env.str("API_URL", "https://api.finegrain.ai/editor"))
     API_VERIFY: str | bool = env.str("CA_BUNDLE", None) or True
+USERS_DB = env.str("USERS_DB", "users.db")
 LOGLEVEL = env.str("LOGLEVEL", "INFO").upper()
 LOGLEVEL_INT: int = logging.getLevelNamesMapping().get(LOGLEVEL, logging.INFO)
 
@@ -37,7 +39,30 @@ USER_AGENT = "finegrain-discord-bot"
 SCISSORS_EMOJI = "\u2702\ufe0f"
 INFO_EMOJI = "\u2139\ufe0f"
 
-USERS: dict[int, str] = {}  # user_id -> api_key
+
+def init_db() -> None:
+    with sqlite3.connect(USERS_DB) as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, api_key TEXT NOT NULL)")
+        conn.commit()
+
+
+def add_user(user_id: int, api_key: str) -> None:
+    with sqlite3.connect(USERS_DB) as conn:
+        conn.execute("INSERT OR REPLACE INTO users (user_id, api_key) VALUES (?, ?)", (user_id, api_key))
+        conn.commit()
+
+
+def maybe_get_user(user_id: int) -> str | None:
+    with sqlite3.connect(USERS_DB) as conn:
+        cursor = conn.execute("SELECT api_key FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+
+def remove_user(user_id: int) -> None:
+    with sqlite3.connect(USERS_DB) as conn:
+        conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+        conn.commit()
 
 
 def is_api_key_valid(api_key: str) -> bool:
@@ -283,7 +308,7 @@ def _safe_before_after(
 
 
 def is_logged_in(interaction: discord.Interaction) -> bool:
-    return interaction.user.id in USERS
+    return maybe_get_user(interaction.user.id) is not None
 
 
 def is_logged_out(interaction: discord.Interaction) -> bool:
@@ -353,7 +378,7 @@ async def login(interaction: discord.Interaction, api_key: str) -> None:
         await interaction.response.send_message(reply, ephemeral=True)
         return
 
-    USERS[interaction.user.id] = api_key
+    add_user(interaction.user.id, api_key)
     await interaction.response.send_message("\N{WHITE HEAVY CHECK MARK} You are now logged in.", ephemeral=True)
 
 
@@ -361,8 +386,10 @@ async def login(interaction: discord.Interaction, api_key: str) -> None:
 @app_commands.check(is_logged_in)
 async def info(interaction: discord.Interaction) -> None:
     """View information about your Finegrain account."""
+    api_key = maybe_get_user(interaction.user.id)
+    assert api_key is not None
     api_ctx = EditorAPIContext(
-        api_key=USERS[interaction.user.id],
+        api_key=api_key,
         base_url=API_URL,
         priority=API_PRIORITY,
         user_agent=USER_AGENT,
@@ -389,7 +416,7 @@ async def info(interaction: discord.Interaction) -> None:
 @app_commands.check(is_logged_in)
 async def logout(interaction: discord.Interaction) -> None:
     """Unlink your Finegrain account from the bot."""
-    del USERS[interaction.user.id]
+    remove_user(interaction.user.id)
     await interaction.response.send_message("You are now logged out.", ephemeral=True)
 
 
@@ -409,7 +436,8 @@ async def erase(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    api_key = USERS[interaction.user.id]
+    api_key = maybe_get_user(interaction.user.id)
+    assert api_key is not None
     async with get_api_ctx(api_key) as api_ctx:
         output_image = await _call_object_eraser(api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
@@ -434,7 +462,8 @@ async def extract(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    api_key = USERS[interaction.user.id]
+    api_key = maybe_get_user(interaction.user.id)
+    assert api_key is not None
     async with get_api_ctx(api_key) as api_ctx:
         output_image = await _call_object_cutter(api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
@@ -514,6 +543,7 @@ async def start_bot(reconnect: bool = True, debug: bool = False) -> None:
 
 
 def main() -> None:
+    init_db()
     asyncio.run(start_bot(debug=DISCORD_DEBUG))
 
 
