@@ -82,6 +82,7 @@ async def get_api_ctx(api_key: str):
         base_url=API_URL,
         priority=API_PRIORITY,
         user_agent=USER_AGENT,
+        verify=API_VERIFY,
     )
 
     await api_ctx.login()
@@ -365,6 +366,7 @@ async def login(interaction: discord.Interaction, api_key: str) -> None:
         base_url=API_URL,
         priority=API_PRIORITY,
         user_agent=USER_AGENT,
+        verify=API_VERIFY,
     )
 
     try:
@@ -393,6 +395,7 @@ async def info(interaction: discord.Interaction) -> None:
         base_url=API_URL,
         priority=API_PRIORITY,
         user_agent=USER_AGENT,
+        verify=API_VERIFY,
     )
 
     try:
