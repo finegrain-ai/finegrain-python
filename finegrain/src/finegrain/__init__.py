@@ -10,7 +10,7 @@ from typing import IO, Any, Literal, NewType, cast, get_args
 
 import httpx
 import httpx_sse
-from httpx._types import QueryParamTypes, RequestData, RequestFiles
+from httpx._types import QueryParamTypes, RequestData, RequestFiles  # pyright: ignore[reportPrivateImportUsage]
 
 logger = logging.getLogger(__name__)
 
