@@ -23,12 +23,10 @@ with env.prefixed("DISCORD_"):
     DISCORD_DEBUG = env.bool("DEBUG", False)
 with env.prefixed("FG_"):
     API_URL: str = str(env.str("API_URL", "https://api.finegrain.ai/editor"))
-    API_KEY: str | None = env.str("API_KEY")
     API_VERIFY: str | bool = env.str("CA_BUNDLE", None) or True
 LOGLEVEL = env.str("LOGLEVEL", "INFO").upper()
 LOGLEVEL_INT: int = logging.getLevelNamesMapping().get(LOGLEVEL, logging.INFO)
 
-assert API_KEY is not None
 assert DISCORD_GUILD_ID is not None
 DISCORD_GUILD = discord.Object(id=DISCORD_GUILD_ID)  # aka "server" in the Discord UI
 
@@ -37,6 +35,9 @@ ALLOWED_IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp")
 API_PRIORITY: Priority = "standard"
 USER_AGENT = "finegrain-discord-bot"
 SCISSORS_EMOJI = "\u2702\ufe0f"
+INFO_EMOJI = "\u2139\ufe0f"
+
+USERS: dict[int, str] = {}  # user_id -> api_key
 
 
 def is_api_key_valid(api_key: str) -> bool:
@@ -96,9 +97,8 @@ class TooLargeOutputError(app_commands.AppCommandError):
 
 
 class FinegrainBot(discord.Client):
-    def __init__(self, api_key: str, *, intents: discord.Intents):
+    def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
-        self.api_key = api_key
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
@@ -109,8 +109,7 @@ class FinegrainBot(discord.Client):
 intents = Intents.default()
 intents.message_content = True
 
-assert is_api_key_valid(API_KEY), f"invalid API key: {API_KEY}"
-bot = FinegrainBot(API_KEY, intents=intents)
+bot = FinegrainBot(intents=intents)
 
 _log = logging.getLogger(__name__)
 
@@ -283,6 +282,14 @@ def _safe_before_after(
     return input_image.to_discord_file(), output_image.to_discord_file()
 
 
+def is_logged_in(interaction: discord.Interaction) -> bool:
+    return interaction.user.id in USERS
+
+
+def is_logged_out(interaction: discord.Interaction) -> bool:
+    return not is_logged_in(interaction)
+
+
 @bot.event
 async def on_ready() -> None:
     _log.info(f"logged in as {bot.user}")
@@ -292,10 +299,18 @@ async def on_ready() -> None:
 async def show_help(interaction: discord.Interaction):
     """Show help for the Finegrain Bot."""
     # ruff: noqa: E501
-    help_message = dedent("""
+    help_message = dedent(f"""
     **Finegrain Discord bot. \N{SPARKLES} Edit images with prompts!**
 
+    **Basic commands:**
     `/help` - Show this help message
+    `/login <api_key>` - Link your Finegrain account to the bot using your `FGAPI-123456-...` API key.
+    `/info` - View information about your Finegrain account like remaining credits.
+    `/logout` - Unlink your Finegrain account from the bot.
+
+    {INFO_EMOJI} To get an API key, create an account at https://editor.finegrain.ai/signup and go to the "Account settings" page.
+
+    **Image editing commands:**
     `/erase <prompt>` - Remove specific objects from an image, including their shadows and reflections, based on your prompt.
     `/extract <prompt>` - Isolate specific objects by removing the background based on your prompt.
 
@@ -306,7 +321,76 @@ async def show_help(interaction: discord.Interaction):
     ```
     """)
     # ruff: enable
-    await interaction.response.send_message(help_message)
+    await interaction.response.send_message(help_message, suppress_embeds=True)
+
+
+@bot.tree.command(name="login")
+@app_commands.describe(
+    api_key="Your Finegrain API key created at https://editor.finegrain.ai/.",
+)
+@app_commands.check(is_logged_out)
+async def login(interaction: discord.Interaction, api_key: str) -> None:
+    """Link your Finegrain account to the bot."""
+    if not is_api_key_valid(api_key):
+        await interaction.response.send_message("\N{CROSS MARK} The API key format is invalid.", ephemeral=True)
+        return
+
+    api_ctx = EditorAPIContext(
+        api_key=api_key,
+        base_url=API_URL,
+        priority=API_PRIORITY,
+        user_agent=USER_AGENT,
+    )
+
+    try:
+        await api_ctx.login()
+    except Exception as e:
+        _log.error(f"login failed for {interaction.user.id}", exc_info=e)
+        if '"not found"' in str(e):
+            reply = "Login failed: API key not found. Please double-check you copied it correctly."
+        else:
+            reply = "Oops! Something went wrong. Please give it another try in a bit."
+        await interaction.response.send_message(reply, ephemeral=True)
+        return
+
+    USERS[interaction.user.id] = api_key
+    await interaction.response.send_message("\N{WHITE HEAVY CHECK MARK} You are now logged in.", ephemeral=True)
+
+
+@bot.tree.command(name="info")
+@app_commands.check(is_logged_in)
+async def info(interaction: discord.Interaction) -> None:
+    """View information about your Finegrain account."""
+    api_ctx = EditorAPIContext(
+        api_key=USERS[interaction.user.id],
+        base_url=API_URL,
+        priority=API_PRIORITY,
+        user_agent=USER_AGENT,
+    )
+
+    try:
+        await api_ctx.login()
+        resp = await api_ctx.request("GET", "auth/me")
+        info = resp.json()
+    except Exception as e:
+        _log.error(f"info failed for {interaction.user.id}", exc_info=e)
+        await interaction.response.send_message(
+            "Oops! Something went wrong. Please give it another try in a bit.", ephemeral=True
+        )
+        return
+
+    uid, api_key, num_credits = info["uid"], info["api_key"], info["credits"]
+    num_credits = "unlimited" if num_credits == -1 else num_credits
+    reply = f"Your info - {interaction.user.mention}\n```User ID: {uid}\nAPI key: {api_key}\nCredits: {num_credits}```"
+    await interaction.response.send_message(reply, ephemeral=True)
+
+
+@bot.tree.command(name="logout")
+@app_commands.check(is_logged_in)
+async def logout(interaction: discord.Interaction) -> None:
+    """Unlink your Finegrain account from the bot."""
+    del USERS[interaction.user.id]
+    await interaction.response.send_message("You are now logged out.", ephemeral=True)
 
 
 @bot.tree.command()
@@ -315,6 +399,7 @@ async def show_help(interaction: discord.Interaction):
     attachment="The input image.",
     prompt="Describe the object(s) you want to erase from the image.",
 )
+@app_commands.check(is_logged_in)
 async def erase(
     interaction: discord.Interaction,
     attachment: discord.Attachment,
@@ -324,7 +409,8 @@ async def erase(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    async with get_api_ctx(bot.api_key) as api_ctx:
+    api_key = USERS[interaction.user.id]
+    async with get_api_ctx(api_key) as api_ctx:
         output_image = await _call_object_eraser(api_ctx, input_image, prompt)
     assert output_image.content_type == "image/jpeg"
     reply = f"\N{SPONGE} Before/After for prompt '{prompt}':"
@@ -338,6 +424,7 @@ async def erase(
     attachment="The input image.",
     prompt="Describe the object(s) you want to extract from the image.",
 )
+@app_commands.check(is_logged_in)
 async def extract(
     interaction: discord.Interaction,
     attachment: discord.Attachment,
@@ -347,7 +434,8 @@ async def extract(
     input_image = await _load_attached_image(attachment)
     interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     await interaction.response.defer(thinking=True)
-    async with get_api_ctx(bot.api_key) as api_ctx:
+    api_key = USERS[interaction.user.id]
+    async with get_api_ctx(api_key) as api_ctx:
         output_image = await _call_object_cutter(api_ctx, input_image, prompt)
     assert output_image.content_type == "image/png"
     reply = f"{SCISSORS_EMOJI} Before/After for prompt '{prompt}':"
@@ -363,7 +451,10 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
     command = interaction.command.name if interaction.command is not None else "N/A"
     _log.error(f"command={command}", exc_info=error)
 
+    reply = "Oops! Something went wrong \N{CONFUSED FACE}. Give it another try in a bit!"
+    ephemeral = False
     files: list[discord.File] = []
+
     if isinstance(error, UserInputError):
         reply = f"Oops! That file doesn't work \N{THINKING FACE}. {error}"
     elif isinstance(error, ObjectNotFoundError):
@@ -384,13 +475,24 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
             f"Oops! Could not reliably segment the object(s) in the image based on the prompt '{error.prompt}' "
             "\N{CONFUSED FACE}. "
         )
-    else:
-        reply = "Oops! Something went wrong \N{CONFUSED FACE}. Give it another try in a bit!"
+    elif isinstance(error, app_commands.CheckFailure):
+        ephemeral = True
+        match command:
+            case "login":
+                reply = "You are already logged in. Use `/logout` if need be."
+            case "logout":
+                reply = "You are not logged in, nothing to do."
+            case "erase" | "extract":
+                reply = "This command requires you to `/login` first."
+            case "info":
+                reply = "Please `/login` to view your account information."
+            case _:
+                pass
 
     if interaction.response.type == discord.InteractionResponseType.deferred_channel_message:
-        await interaction.followup.send(reply, files=files)
+        await interaction.followup.send(reply, files=files, ephemeral=ephemeral)
     else:
-        await interaction.response.send_message(reply, files=files)
+        await interaction.response.send_message(reply, files=files, ephemeral=ephemeral)
 
 
 async def start_bot(reconnect: bool = True, debug: bool = False) -> None:
