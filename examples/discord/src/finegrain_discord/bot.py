@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from dataclasses import dataclass
 from io import BytesIO
 from textwrap import dedent
@@ -21,8 +22,7 @@ with env.prefixed("DISCORD_"):
     DISCORD_DEBUG = env.bool("DEBUG", False)
 with env.prefixed("FG_"):
     API_URL: str = str(env.str("API_URL", "https://api.finegrain.ai/editor"))
-    API_USER: str | None = env.str("API_USER")
-    API_PASSWORD: str | None = env.str("API_PASSWORD")
+    API_KEY: str | None = env.str("API_KEY")
     API_VERIFY: str | bool = env.str("CA_BUNDLE", None) or True
 LOGLEVEL = env.str("LOGLEVEL", "INFO").upper()
 LOGLEVEL_INT: int = logging.getLevelNamesMapping().get(LOGLEVEL, logging.INFO)
@@ -30,9 +30,14 @@ LOGLEVEL_INT: int = logging.getLevelNamesMapping().get(LOGLEVEL, logging.INFO)
 assert DISCORD_GUILD_ID is not None
 DISCORD_GUILD = discord.Object(id=DISCORD_GUILD_ID)  # aka "server" in the Discord UI
 
+API_KEY_PATTERN = re.compile(r"^FGAPI(\-[A-Z0-9]{6}){4}$")
 ALLOWED_IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp")
 API_PRIORITY: Priority = "standard"
 SCISSORS_EMOJI = "\u2702\ufe0f"
+
+
+def is_api_key_valid(api_key: str) -> bool:
+    return bool(API_KEY_PATTERN.match(api_key))
 
 
 def is_error(result: Any) -> TypeIs[ErrorResult]:
@@ -89,12 +94,10 @@ class FinegrainBot(discord.Client):
 intents = Intents.default()
 intents.message_content = True
 
-assert API_USER is not None
-assert API_PASSWORD is not None
+assert is_api_key_valid(API_KEY), f"invalid API key: {API_KEY}"
 api_ctx = EditorAPIContext(
     base_url=API_URL,
-    user=API_USER,
-    password=API_PASSWORD,
+    api_key=API_KEY,
     priority=API_PRIORITY,
     verify=API_VERIFY,
     user_agent="finegrain-discord-bot",
