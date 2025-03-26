@@ -11,3 +11,5 @@ wheels/
 
 requirements-dev.lock
 .env
+users.db
+data/
