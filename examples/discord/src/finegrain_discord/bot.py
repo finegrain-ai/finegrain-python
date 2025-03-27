@@ -298,10 +298,9 @@ async def _call_object_cutter(api_ctx: EditorAPIContext, image: BotImage, prompt
         )
 
 
-async def _load_attached_image(attachment: discord.Attachment) -> BotImage:
+def _check_content_type(attachment: discord.Attachment) -> None:
     if attachment.content_type not in ALLOWED_IMAGE_TYPES:
         raise UserInputError("Please upload a PNG, JPEG or WebP image.")
-    return await BotImage.from_attachment(attachment)
 
 
 def _safe_before_after(
@@ -448,9 +447,10 @@ async def erase(
     prompt: str,
 ) -> None:
     """Erase one or more objects from the attached image."""
-    input_image = await _load_attached_image(attachment)
-    interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
+    _check_content_type(attachment)
     await interaction.response.defer(thinking=True)
+    input_image = await BotImage.from_attachment(attachment)
+    interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     api_key = maybe_get_user(interaction.user.id)
     assert api_key is not None
     async with get_api_ctx(api_key) as api_ctx:
@@ -474,9 +474,10 @@ async def extract(
     prompt: str,
 ) -> None:
     """Extract one or more objects from the attached image."""
-    input_image = await _load_attached_image(attachment)
-    interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
+    _check_content_type(attachment)
     await interaction.response.defer(thinking=True)
+    input_image = await BotImage.from_attachment(attachment)
+    interaction.extras["input_file"] = discord.File(BytesIO(input_image.data), filename=attachment.filename)
     api_key = maybe_get_user(interaction.user.id)
     assert api_key is not None
     async with get_api_ctx(api_key) as api_ctx:
