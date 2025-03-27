@@ -47,6 +47,7 @@ def init_db() -> None:
 
 
 def add_user(user_id: int, api_key: str) -> None:
+    assert is_api_key_valid(api_key)
     with sqlite3.connect(USERS_DB) as conn:
         conn.execute("INSERT OR REPLACE INTO users (user_id, api_key) VALUES (?, ?)", (user_id, api_key))
         conn.commit()
