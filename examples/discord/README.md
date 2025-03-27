@@ -6,7 +6,7 @@ Easily try out the Finegrain API right from Discord. Built on top of [discord.py
 
 1. Install [Rye](https://rye.astral.sh/)
 2. Run `rye sync`
-3. Copy `.env.example` to `.env`, then update it with your credentials
+3. Copy `.env.example` to `.env` and configure it as you see fit. See `USERS_DB` in particular (SQLite database file)
 
 ## Run
 
