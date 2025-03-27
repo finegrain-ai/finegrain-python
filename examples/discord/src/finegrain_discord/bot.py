@@ -388,7 +388,7 @@ async def login(interaction: discord.Interaction, api_key: str) -> None:
         if '"not found"' in str(e):
             reply = "Login failed: API key not found. Please double-check you copied it correctly."
         else:
-            reply = "Oops! Something went wrong. Please give it another try in a bit."
+            reply = "Oops! Something went wrong while logging in. Please try again in a bit."
         await interaction.response.send_message(reply, ephemeral=True)
         return
 
@@ -417,7 +417,7 @@ async def info(interaction: discord.Interaction) -> None:
     except Exception as e:
         _log.error(f"info failed for {interaction.user.id}", exc_info=e)
         await interaction.response.send_message(
-            "Oops! Something went wrong. Please give it another try in a bit.", ephemeral=True
+            "Oops! Something went wrong while fetching your info. Please try again in a bit.", ephemeral=True
         )
         return
 
