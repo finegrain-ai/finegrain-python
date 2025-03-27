@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 import sqlite3
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from io import BytesIO
@@ -84,7 +85,7 @@ def is_error(result: Any) -> TypeIs[ErrorResult]:
 
 
 @asynccontextmanager
-async def get_api_ctx(api_key: str):
+async def get_api_ctx(api_key: str) -> AsyncIterator[EditorAPIContext]:
     api_ctx = EditorAPIContext(
         api_key=api_key,
         base_url=API_URL,
