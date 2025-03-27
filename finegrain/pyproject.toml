@@ -1,6 +1,6 @@
 [project]
 name = "finegrain"
-version = "0.1.0"
+version = "0.2.0"
 description = "Finegrain API client"
 authors = [
     { name = "Pierre Chapuis", email = "pierre@lagon.tech" }

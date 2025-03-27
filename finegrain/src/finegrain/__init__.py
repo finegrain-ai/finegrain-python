@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 Priority = Literal["low", "standard", "high"]
 StateID = NewType("StateID", str)
 
-VERSION = "0.1"
+VERSION = "0.2"
 
 API_KEY_PATTERN = re.compile(r"^FGAPI(\-[A-Z0-9]{6}){4}$")
 EMAIL_PWD_PATTERN = re.compile(r"^\s*(?P<email>[\S]+?@[\S]+?):(?P<pwd>\S+)\s*$")
@@ -807,6 +807,22 @@ class ShadowResultWithImage(OKResultWithImage, ShadowResult):
     pass
 
 
+class SwitchLightResult(OKResultWithUsedSeeds):
+    pass
+
+
+class SwitchLightResultWithImage(OKResultWithImage, SwitchLightResult):
+    pass
+
+
+class SetLightParamsResult(OKResultWithUsedSeeds):
+    pass
+
+
+class SetLightParamsResultWithImage(OKResultWithImage, SetLightParamsResult):
+    pass
+
+
 class RecolorResult(OKResult):
     @property
     def color(self) -> tuple[int, int, int] | tuple[int, int, int, int]:
@@ -986,22 +1002,6 @@ class EditorApiAsyncClient:
         st, ok = await self.ctx.call_skill(f"infer-main-subject/{state_id}", timeout=timeout)
         return await self._response(st, ok, InferMainSubjectResult)
 
-    async def infer_commercial_description(
-        self,
-        state_id: StateID,
-        product_name: str | None = None,
-        timeout: float | None = None,
-    ) -> InferCommercialDescriptionResult | ErrorResult:
-        params: dict[str, Any] = {}
-        if product_name is not None:
-            params["product_name"] = product_name
-        st, ok = await self.ctx.call_skill(
-            f"infer-commercial-description/{state_id}",
-            params,
-            timeout=timeout,
-        )
-        return await self._response(st, ok, InferCommercialDescriptionResult)
-
     async def infer_bbox(
         self,
         state_id: StateID,
@@ -1153,6 +1153,38 @@ class EditorApiAsyncClient:
             image_params = None if isinstance(with_image, bool) else with_image
             return await self._response_with_image(st, ok, ShadowResultWithImage, params=image_params)
         return await self._response(st, ok, ShadowResult)
+
+    async def switch_light(
+        self,
+        state_id: StateID,
+        seed: int | None = None,
+        mode: Mode = "premium",
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> SwitchLightResult | ErrorResult:
+        params: dict[str, Any] = {"mode": mode}
+        if seed is not None:
+            params["seed"] = seed
+        st, ok = await self.ctx.call_skill(f"switch-light/{state_id}", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, SwitchLightResultWithImage, params=image_params)
+        return await self._response(st, ok, SwitchLightResult)
+
+    async def set_light_params(
+        self,
+        state_id: StateID,
+        brightness: float = 1.0,
+        warmth: float = 1.0,
+        with_image: bool | ImageOutParams = False,
+        timeout: float | None = None,
+    ) -> SetLightParamsResult | ErrorResult:
+        params: dict[str, Any] = {"brightness": brightness, "warmth": warmth}
+        st, ok = await self.ctx.call_skill(f"switch-light/{state_id}", params, timeout=timeout)
+        if with_image:
+            image_params = None if isinstance(with_image, bool) else with_image
+            return await self._response_with_image(st, ok, SetLightParamsResultWithImage, params=image_params)
+        return await self._response(st, ok, SetLightParamsResult)
 
     async def recolor(
         self,
