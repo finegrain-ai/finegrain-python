@@ -986,22 +986,6 @@ class EditorApiAsyncClient:
         st, ok = await self.ctx.call_skill(f"infer-main-subject/{state_id}", timeout=timeout)
         return await self._response(st, ok, InferMainSubjectResult)
 
-    async def infer_commercial_description(
-        self,
-        state_id: StateID,
-        product_name: str | None = None,
-        timeout: float | None = None,
-    ) -> InferCommercialDescriptionResult | ErrorResult:
-        params: dict[str, Any] = {}
-        if product_name is not None:
-            params["product_name"] = product_name
-        st, ok = await self.ctx.call_skill(
-            f"infer-commercial-description/{state_id}",
-            params,
-            timeout=timeout,
-        )
-        return await self._response(st, ok, InferCommercialDescriptionResult)
-
     async def infer_bbox(
         self,
         state_id: StateID,
