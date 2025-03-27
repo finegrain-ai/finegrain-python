@@ -1180,7 +1180,7 @@ class EditorApiAsyncClient:
         timeout: float | None = None,
     ) -> SetLightParamsResult | ErrorResult:
         params: dict[str, Any] = {"brightness": brightness, "warmth": warmth}
-        st, ok = await self.ctx.call_skill(f"switch-light/{state_id}", params, timeout=timeout)
+        st, ok = await self.ctx.call_skill(f"set-light-params/{state_id}", params, timeout=timeout)
         if with_image:
             image_params = None if isinstance(with_image, bool) else with_image
             return await self._response_with_image(st, ok, SetLightParamsResultWithImage, params=image_params)
