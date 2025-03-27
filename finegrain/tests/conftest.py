@@ -56,3 +56,9 @@ def coffee_plant_bytes() -> bytes:
 def sofa_cushion_bytes() -> bytes:
     with open(PARENT_PATH / "fixtures" / "sofa-cushion.jpg", "rb") as f:
         return f.read()
+
+
+@pytest.fixture(scope="function")
+def table_lamp_bytes() -> bytes:
+    with open(PARENT_PATH / "fixtures" / "table-lamp.jpg", "rb") as f:
+        return f.read()
