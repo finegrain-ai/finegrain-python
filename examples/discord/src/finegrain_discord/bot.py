@@ -69,9 +69,16 @@ def is_api_key_valid(api_key: str) -> bool:
     return bool(API_KEY_PATTERN.match(api_key))
 
 
+def raise_api_error(result: ErrorResult) -> None:
+    if result.error == "not enough credits":
+        raise NotEnoughCreditsError()
+    else:
+        raise RuntimeError(result.error)
+
+
 def is_error(result: Any) -> TypeIs[ErrorResult]:
     if isinstance(result, ErrorResult):
-        raise RuntimeError(result.error)
+        raise_api_error(result)
     return False
 
 
@@ -106,6 +113,10 @@ class ObjectNotFoundError(app_commands.AppCommandError):
 class BadQualityMaskError(app_commands.AppCommandError):
     def __init__(self, prompt: str) -> None:
         self.prompt = prompt
+
+
+class NotEnoughCreditsError(app_commands.AppCommandError):
+    pass
 
 
 class TooLargeOutputError(app_commands.AppCommandError):
@@ -203,7 +214,7 @@ async def _call_segment(
         elif segment_r.error.startswith("could not infer a reliable mask"):
             raise BadQualityMaskError(prompt=prompt)
         else:
-            raise RuntimeError(segment_r.error)
+            raise_api_error(segment_r)
 
     return st_input, segment_r.state_id
 
@@ -229,7 +240,7 @@ async def _call_multi_segment(
     segmentation_results = [r.result() for r in segmentation_responses]
     if any(isinstance(r, ErrorResult) for r in segmentation_results):
         err = next(r for r in segmentation_results if isinstance(r, ErrorResult))
-        raise RuntimeError(err.error)
+        raise_api_error(err)
 
     st_masks = [r.state_id for r in segmentation_results]
     if len(st_masks) == 1:
@@ -507,6 +518,13 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
             f"Oops! Could not reliably segment the object(s) in the image based on the prompt '{error.prompt}' "
             "\N{CONFUSED FACE}. "
         )
+    elif isinstance(error, NotEnoughCreditsError):
+        ephemeral = True
+        reply = (
+            "Oops! You don't have enough credits to complete this command.\n"
+            "\N{WHITE RIGHT POINTING BACKHAND INDEX} Go to https://editor.finegrain.ai/ to top up your account.\n"
+            "\N{ELECTRIC LIGHT BULB} Use the `/info` command at any time to check your current balance."
+        )
     elif isinstance(error, app_commands.CheckFailure):
         ephemeral = True
         match command:
@@ -522,9 +540,9 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
                 pass
 
     if interaction.response.type == discord.InteractionResponseType.deferred_channel_message:
-        await interaction.followup.send(reply, files=files, ephemeral=ephemeral)
+        await interaction.followup.send(reply, files=files, ephemeral=ephemeral, suppress_embeds=True)
     else:
-        await interaction.response.send_message(reply, files=files, ephemeral=ephemeral)
+        await interaction.response.send_message(reply, files=files, ephemeral=ephemeral, suppress_embeds=True)
 
 
 async def start_bot(reconnect: bool = True, debug: bool = False) -> None:
