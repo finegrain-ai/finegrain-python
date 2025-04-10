@@ -117,6 +117,16 @@ class BadQualityMaskError(app_commands.AppCommandError):
         self.prompt = prompt
 
 
+class BadPromptError(app_commands.AppCommandError):
+    def __init__(self, prompt: str) -> None:
+        self.prompt = prompt
+
+
+class PromptNotSuitableError(app_commands.AppCommandError):
+    def __init__(self, prompt: str) -> None:
+        self.prompt = prompt
+
+
 class NotEnoughCreditsError(app_commands.AppCommandError):
     pass
 
@@ -215,6 +225,10 @@ async def _call_segment(
             raise ObjectNotFoundError(prompt=prompt)
         elif segment_r.error.startswith("could not infer a reliable mask"):
             raise BadQualityMaskError(prompt=prompt)
+        elif "prompt could not be processed" in segment_r.error:
+            raise BadPromptError(prompt=prompt)
+        elif "prompt not suitable" in segment_r.error:
+            raise PromptNotSuitableError(prompt=prompt)
         else:
             raise_api_error(segment_r)
 
@@ -528,6 +542,10 @@ async def on_error(interaction: discord.Interaction, error: app_commands.AppComm
             "\N{WHITE RIGHT POINTING BACKHAND INDEX} Go to https://editor.finegrain.ai/ to top up your account.\n"
             "\N{ELECTRIC LIGHT BULB} Use the `/info` command at any time to check your current balance."
         )
+    elif isinstance(error, BadPromptError):
+        reply = f"Oops! The prompt '{error.prompt}' could not be processed. Try again with a different prompt!"
+    elif isinstance(error, PromptNotSuitableError):
+        reply = f"Oops! The prompt '{error.prompt}' is not suitable. Try again with a different prompt!"
     elif isinstance(error, app_commands.CheckFailure):
         ephemeral = True
         match command:
