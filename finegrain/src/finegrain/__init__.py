@@ -835,8 +835,9 @@ class RecolorResultWithImage(OKResultWithImage, RecolorResult):
 
 class CutoutResult(OKResult):
     @property
-    def mask_bbox(self) -> BoundingBox:
-        return _bbox(self.meta["mask_bbox"])
+    def mask_bbox(self) -> BoundingBox | None:
+        if "mask_bbox" in self.meta:
+            return _bbox(self.meta["mask_bbox"])
 
 
 class CutoutResultWithImage(OKResultWithImage, CutoutResult):
@@ -1032,6 +1033,7 @@ class EditorApiAsyncClient:
         state_id: StateID,
         bbox: BoundingBox | None = None,
         prompt: str | None = None,
+        *,
         mask_quality: MaskQuality | None = None,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
@@ -1053,6 +1055,7 @@ class EditorApiAsyncClient:
         self,
         image_state_id: StateID,
         mask_state_id: StateID,
+        *,
         seed: int | None = None,
         mode: Mode = "standard",
         with_image: bool | ImageOutParams = False,
@@ -1078,6 +1081,7 @@ class EditorApiAsyncClient:
         bbox: BoundingBox | None = None,
         flip: bool = False,
         rotation_angle: float = 0.0,
+        *,
         seed: int | None = None,
         mode: Mode = "standard",
         with_image: bool | ImageOutParams = False,
@@ -1110,6 +1114,7 @@ class EditorApiAsyncClient:
         resemblance: float | None = None,
         decay: float | None = None,
         creativity: float | None = None,
+        *,
         seed: int | None = None,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
@@ -1135,6 +1140,7 @@ class EditorApiAsyncClient:
         resolution: Size2D | None = None,
         bbox: BoundingBox | None = None,
         background: str | None = None,
+        *,
         seed: int | None = None,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
@@ -1157,6 +1163,7 @@ class EditorApiAsyncClient:
     async def switch_light(
         self,
         state_id: StateID,
+        *,
         seed: int | None = None,
         mode: Mode = "premium",
         with_image: bool | ImageOutParams = False,
@@ -1176,6 +1183,7 @@ class EditorApiAsyncClient:
         state_id: StateID,
         brightness: float = 1.0,
         warmth: float = 1.0,
+        *,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> SetLightParamsResult | ErrorResult:
@@ -1191,6 +1199,7 @@ class EditorApiAsyncClient:
         image_state_id: StateID,
         mask_state_id: StateID,
         color: str,
+        *,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> RecolorResult | ErrorResult:
@@ -1208,10 +1217,15 @@ class EditorApiAsyncClient:
         self,
         image_state_id: StateID,
         mask_state_id: StateID,
+        preserve_location: bool = False,
+        *,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> CutoutResult | ErrorResult:
-        st, ok = await self.ctx.call_skill(f"cutout/{image_state_id}/{mask_state_id}", timeout=timeout)
+        params: dict[str, Any] = {}
+        if preserve_location:
+            params["preserve_location"] = True
+        st, ok = await self.ctx.call_skill(f"cutout/{image_state_id}/{mask_state_id}", params, timeout=timeout)
         if with_image:
             image_params = None if isinstance(with_image, bool) else with_image
             return await self._response_with_image(st, ok, CutoutResultWithImage, params=image_params)
@@ -1221,6 +1235,7 @@ class EditorApiAsyncClient:
         self,
         state_id: StateID,
         bbox: BoundingBox | None = None,
+        *,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> CropResult | ErrorResult:
@@ -1237,6 +1252,7 @@ class EditorApiAsyncClient:
         self,
         state_ids: list[StateID],
         operation: Literal["union", "difference"] = "union",
+        *,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> MergeMasksResult | ErrorResult:
@@ -1251,6 +1267,7 @@ class EditorApiAsyncClient:
         self,
         resolution: Size2D,
         cutouts: list[MergeCutoutsEntry],
+        *,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> MergeCutoutsResult | ErrorResult:
@@ -1267,6 +1284,7 @@ class EditorApiAsyncClient:
         self,
         state_id: StateID,
         background: str,
+        *,
         with_image: bool | ImageOutParams = False,
         timeout: float | None = None,
     ) -> SetBackgroundColorResult | ErrorResult:
