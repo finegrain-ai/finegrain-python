@@ -554,7 +554,9 @@ class EditorAPIContext:
         params: dict[str, Any] | None = None,
         timeout: float | None = None,
     ) -> tuple[StateID, bool]:
-        params = {"priority": self.priority} | (params or {})
+        timeout = timeout or self.default_timeout
+        user_timeout = max(int(timeout), 1)
+        params = {"priority": self.priority, "user_timeout": user_timeout} | (params or {})
         response = await self.request("POST", f"skills/{url}", json=params)
         state_id: StateID = response.json()["state"]
         status = await self.sse_await(state_id, timeout=timeout)
