@@ -24,14 +24,25 @@ def event_loop():
 
 
 @pytest.fixture(scope="session")
-async def fgctx() -> AsyncGenerator[EditorAPIContext, None]:
+def fx_base_url() -> str:
+    with env.prefixed("FG_API_"):
+        url = env.str("URL", "https://api.finegrain.ai/editor")
+    return url
+
+
+@pytest.fixture(scope="session")
+def fx_credentials() -> str:
     with env.prefixed("FG_API_"):
         credentials = env.str("CREDENTIALS", None)
-        url = env.str("URL", "https://api.finegrain.ai/editor")
-    assert credentials and url, "set FG_API_CREDENTIALS"
+    assert credentials, "set FG_API_CREDENTIALS"
+    return credentials
+
+
+@pytest.fixture(scope="session")
+async def fgctx(fx_base_url: str, fx_credentials: str) -> AsyncGenerator[EditorAPIContext, None]:
     ctx = EditorAPIContext(
-        credentials=credentials,
-        base_url=url,
+        base_url=fx_base_url,
+        credentials=fx_credentials,
         user_agent="finegrain-python-tests",
     )
 

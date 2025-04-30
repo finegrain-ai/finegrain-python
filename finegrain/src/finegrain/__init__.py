@@ -305,7 +305,12 @@ class EditorAPIContext:
     user_agent: str
 
     token: str | None
+    subscription_topic: str | None = None
     logger: logging.Logger
+
+    # Note: this is always set when calling `login` or `me` and updated using SSE.
+    # If you use a subscription topic it is *not* updated, use the value
+    # from the response metadata or call `me`.
     credits: int | None = None
 
     _client: httpx.AsyncClient | None
@@ -317,6 +322,7 @@ class EditorAPIContext:
 
     def __init__(
         self,
+        *,
         credentials: str | None = None,
         api_key: str | None = None,
         user: str | None = None,
@@ -325,12 +331,14 @@ class EditorAPIContext:
         priority: Priority = "standard",
         verify: bool | str = True,
         default_timeout: float = 60.0,
+        subscription_topic: str | None = None,
         user_agent: str | None = None,
     ) -> None:
         self.base_url = base_url or "https://api.finegrain.ai/editor"
         self.priority = priority
         self.verify = verify
         self.default_timeout = default_timeout
+        self.subscription_topic = subscription_topic
 
         if credentials is not None:
             if (m := API_KEY_PATTERN.match(credentials)) is not None:
@@ -407,6 +415,12 @@ class EditorAPIContext:
         self.credits = r["user"]["credits"]
         self.token = r["token"]
 
+    async def me(self) -> dict[str, Any]:
+        response = await self.request("GET", "auth/me")
+        r = response.json()
+        self.credits = r["credits"]
+        return r
+
     async def request(
         self,
         method: Literal["GET", "POST"],
@@ -441,7 +455,11 @@ class EditorAPIContext:
         return r
 
     async def get_sub_url(self) -> str:
-        response = await self.request("POST", "sub-auth")
+        if self.subscription_topic is not None:
+            params = {"subscription_topic": self.subscription_topic}
+        else:
+            params = None
+        response = await self.request("POST", "sub-auth", json=params)
         jdata = response.json()
         sub_token = jdata["token"]
         self._ping_interval = float(jdata.get("ping_interval", 0.0))
@@ -557,6 +575,8 @@ class EditorAPIContext:
         timeout = timeout or self.default_timeout
         user_timeout = max(int(timeout), 1)
         params = {"priority": self.priority, "user_timeout": user_timeout} | (params or {})
+        if self.subscription_topic is not None:
+            params["subscription_topic"] = self.subscription_topic
         response = await self.request("POST", f"skills/{url}", json=params)
         state_id: StateID = response.json()["state"]
         status = await self.sse_await(state_id, timeout=timeout)
@@ -926,6 +946,8 @@ class EditorApiAsyncClient:
         data: dict[str, str] = {}
         if file_url is not None:
             data["file_url"] = file_url
+        if self.ctx.subscription_topic is not None:
+            data["subscription_topic"] = self.ctx.subscription_topic
         if meta is not None:
             data["meta"] = json.dumps(meta)
         response = await self.ctx.request("POST", "state/create", files=files, data=data)
