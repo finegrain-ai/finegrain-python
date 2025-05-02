@@ -2,6 +2,20 @@
 
 This is a client for the [Finegrain](https://finegrain.ai) API. It requires Python 3.12+ and is designed for asynchronous code using asyncio. It depends on httpx and [httpx_sse](https://github.com/florimondmanca/httpx-sse).
 
+## Setup
+
+We do not publish this package to PyPI or cut releases for now. Here is how to use it with pip:
+
+```bash
+pip install "git+https://github.com/finegrain-ai/finegrain-python#subdirectory=finegrain"
+```
+
+If you use [uv](https://docs.astral.sh/uv/) (which we recommend) you can do:
+
+```bash
+uv add "finegrain @ git+https://github.com/finegrain-ai/finegrain-python#subdirectory=finegrain"
+```
+
 ## Usage
 
 See [this example script](examples/erase.py) to erase an object from an image by prompt.
