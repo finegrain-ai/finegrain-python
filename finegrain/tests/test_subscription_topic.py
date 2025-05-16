@@ -1,6 +1,6 @@
 import pytest
 
-from finegrain import EditorAPIContext, OKResult
+from finegrain import EditorAPIContext, ImageOutParams, OKResult, OKResultWithImage
 
 
 @pytest.mark.parametrize("subscription_topic", ["fg-test-topic", None])
@@ -10,6 +10,7 @@ async def test_subscription_topic(
     fx_verify: bool,
     sofa_cushion_bytes: bytes,
     subscription_topic: str | None,
+    output_dir: str | None,
 ) -> None:
     ctx = EditorAPIContext(
         base_url=fx_base_url,
@@ -41,5 +42,19 @@ async def test_subscription_topic(
         assert ctx.credits is None
         await ctx.me()
     assert isinstance(ctx.credits, int)
+
+    # test segment (multi-step)
+
+    segment_r = await ctx.call_async.segment(
+        create_r.state_id,
+        prompt="sofa",
+        with_image=ImageOutParams(resolution="DISPLAY", image_format="WEBP"),
+        mask_quality="low",
+    )
+    assert isinstance(segment_r, OKResultWithImage)
+
+    if output_dir:
+        with open(f"{output_dir}/test-subscription-topic-segment-sofa.webp", "wb") as f:
+            f.write(segment_r.image)
 
     await ctx.sse_stop()
