@@ -7,12 +7,14 @@ from finegrain import EditorAPIContext, OKResult
 async def test_subscription_topic(
     fx_base_url: str,
     fx_credentials: str,
+    fx_verify: bool,
     sofa_cushion_bytes: bytes,
     subscription_topic: str | None,
 ) -> None:
     ctx = EditorAPIContext(
         base_url=fx_base_url,
         credentials=fx_credentials,
+        verify=fx_verify,
         user_agent="finegrain-python-tests",
         subscription_topic=subscription_topic,
     )

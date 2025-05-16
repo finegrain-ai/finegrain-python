@@ -39,10 +39,22 @@ def fx_credentials() -> str:
 
 
 @pytest.fixture(scope="session")
-async def fgctx(fx_base_url: str, fx_credentials: str) -> AsyncGenerator[EditorAPIContext, None]:
+def fx_verify() -> bool:
+    with env.prefixed("FG_API_"):
+        verify = env.bool("VERIFY", True)
+    return verify
+
+
+@pytest.fixture(scope="session")
+async def fgctx(
+    fx_base_url: str,
+    fx_credentials: str,
+    fx_verify: bool,
+) -> AsyncGenerator[EditorAPIContext, None]:
     ctx = EditorAPIContext(
         base_url=fx_base_url,
         credentials=fx_credentials,
+        verify=fx_verify,
         user_agent="finegrain-python-tests",
     )
 
