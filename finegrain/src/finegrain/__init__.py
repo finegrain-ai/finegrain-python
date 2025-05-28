@@ -10,6 +10,7 @@ from typing import IO, Any, Literal, NewType, cast, get_args
 
 import httpx
 import httpx_sse
+import jwt
 from httpx._types import QueryParamTypes, RequestData, RequestFiles  # pyright: ignore[reportPrivateImportUsage]
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 Priority = Literal["low", "standard", "high"]
 StateID = NewType("StateID", str)
 
-VERSION = "0.2"
+VERSION = "0.3"
 
 API_KEY_PATTERN = re.compile(r"^FGAPI(\-[A-Z0-9]{6}){4}$")
 EMAIL_PWD_PATTERN = re.compile(r"^\s*(?P<email>[\S]+?@[\S]+?):(?P<pwd>\S+)\s*$")
@@ -293,7 +294,61 @@ class ApiKeyCredentials:
         return f"API key {self.api_key[:13]}..."
 
 
-type Credentials = LoginCredentials | ApiKeyCredentials
+@dc.dataclass(kw_only=True)
+class OAuthCredentials:
+    access_token: str
+    refresh_token: str
+    client_id: str
+    client_secret: str
+    account_url: str = "https://account.finegrain.ai"
+    account_verify: bool | str = True
+
+    def __post_init__(self):
+        self.validate_tokens()
+
+    def validate_tokens(self) -> None:
+        assert self.access_token, "access_token must not be empty"
+        assert self.refresh_token, "refresh_token must not be empty"
+
+        decoded_access = jwt.decode(self.access_token, options={"verify_signature": False})
+        decoded_refresh = jwt.decode(self.refresh_token, options={"verify_signature": False})
+
+        assert decoded_access["aud"] == "access"
+        assert decoded_refresh["aud"] == "refresh"
+
+        sub = decoded_access.get("sub", "")
+        assert sub.startswith("FGUSR-")
+
+        assert decoded_refresh["iss"] == self.client_id
+        assert decoded_refresh["sub"] == sub
+
+    @property
+    def as_login_params(self) -> dict[str, str]:
+        raise ValueError("cannot login with OAuth credentials")
+
+    @property
+    def description(self) -> str:
+        return f"OAuth client {self.client_id}"
+
+    async def renew(self) -> None:
+        async with httpx.AsyncClient(verify=self.account_verify) as client:
+            response = await client.post(
+                url=f"{self.account_url}/oauth/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "refresh_token": self.refresh_token,
+                },
+            )
+        check_status(response)
+        r = response.json()
+        self.access_token = r["access_token"]
+        self.refresh_token = r["refresh_token"]
+        self.validate_tokens()
+
+
+Credentials = LoginCredentials | ApiKeyCredentials | OAuthCredentials
 
 
 class EditorAPIContext:
@@ -323,7 +378,7 @@ class EditorAPIContext:
     def __init__(
         self,
         *,
-        credentials: str | None = None,
+        credentials: Credentials | str | None = None,
         api_key: str | None = None,
         user: str | None = None,
         password: str | None = None,
@@ -340,7 +395,9 @@ class EditorAPIContext:
         self.default_timeout = default_timeout
         self.subscription_topic = subscription_topic
 
-        if credentials is not None:
+        if isinstance(credentials, Credentials):
+            self.credentials = credentials
+        elif credentials is not None:
             if (m := API_KEY_PATTERN.match(credentials)) is not None:
                 self.credentials = ApiKeyCredentials(api_key=m[0])
             elif (m := EMAIL_PWD_PATTERN.match(credentials)) is not None:
@@ -367,6 +424,9 @@ class EditorAPIContext:
             verify=self.verify,
         )
         self.reset()
+        if isinstance(self.credentials, OAuthCredentials):
+            # Use token provided in credentials initially (avoids a useless refresh).
+            self.token = self.credentials.access_token
 
     def reset(self) -> None:
         self.token = None
@@ -404,6 +464,16 @@ class EditorAPIContext:
         return {"Authorization": f"Bearer {self.token}"}
 
     async def login(self) -> None:
+        if isinstance(self.credentials, OAuthCredentials):
+            if self.token is None:
+                await self.credentials.renew()
+                self.token = self.credentials.access_token
+            # If the token is set but invalid, `me` will fail with 401.
+            # The token will be unset and `login` will be called again.
+            r = await self.me()
+            self.credits = r["credits"]
+            self.logger.debug(f"logged in as {self.credentials.description} - {r['username']}")
+            return
         async with self as client:
             response = await client.post(
                 f"{self.base_url}/auth/login",
@@ -447,6 +517,7 @@ class EditorAPIContext:
             r = await _q()
             if r.status_code == 401:
                 self.logger.debug("renewing token")
+                self.token = None
                 await self.login()
                 r = await _q()
 
