@@ -518,8 +518,14 @@ class EditorAPIContext:
             if r.status_code == 401:
                 self.logger.debug("renewing token")
                 self.token = None
-                await self.login()
-                r = await _q()
+                login_ok = False
+                try:
+                    await self.login()
+                    login_ok = True
+                except httpx.HTTPStatusError as e:
+                    self.logger.debug(f"login failed while renewing: {e}")
+                if login_ok:
+                    r = await _q()
 
         if raise_for_status:
             check_status(r)
