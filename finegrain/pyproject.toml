@@ -11,7 +11,7 @@ dependencies = [
     "pyjwt[crypto]>=2.10.1",
 ]
 readme = "README.md"
-requires-python = ">= 3.12, <3.13"
+requires-python = ">= 3.10"
 
 [dependency-groups]
 # pytest-asyncio > 0.21 changes event loop management
@@ -35,7 +35,7 @@ packages = ["src/finegrain"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [

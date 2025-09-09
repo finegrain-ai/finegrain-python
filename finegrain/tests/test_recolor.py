@@ -17,10 +17,7 @@ async def test_recolor(
         (1210, 629, 1298, 733),
     ]
 
-    async with asyncio.TaskGroup() as tg:
-        tasks = [tg.create_task(fgctx.call_async.segment(st_input, bbox)) for bbox in bboxes]
-
-    segment_results = [t.result() for t in tasks]
+    segment_results = await asyncio.gather(*[fgctx.call_async.segment(st_input, bbox) for bbox in bboxes])
     for r in segment_results:
         assert isinstance(r, OKResult)
     segment_state_ids = [r.state_id for r in segment_results]

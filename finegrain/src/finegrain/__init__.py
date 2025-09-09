@@ -6,7 +6,7 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
-from typing import IO, Any, Literal, NewType, cast, get_args
+from typing import IO, Any, Generic, Literal, NewType, TypeVar, cast, get_args
 
 import httpx
 import httpx_sse
@@ -52,7 +52,14 @@ class SSELoopStopped(RuntimeError):
         return f"SSE loop stopped (first error: {self.first_error}, last error: {self.last_error})"
 
 
-class Futures[Tk, Tv]:
+Tk = TypeVar("Tk")
+Tv = TypeVar("Tv")
+Tok = TypeVar("Tok", bound="OKResult")
+Tko = TypeVar("Tko", bound="ErrorResult")
+TokWithImage = TypeVar("TokWithImage", bound="OKResultWithImage")
+
+
+class Futures(Generic[Tk, Tv]):
     _event_loop: asyncio.AbstractEventLoop | None
 
     @property
@@ -140,7 +147,10 @@ class RetryContext:
         self.failures = 0
 
 
-class TimeoutableAsyncIterator[T](AsyncIterator[T]):
+T = TypeVar("T")
+
+
+class TimeoutableAsyncIterator(AsyncIterator[T], Generic[T]):
     def __init__(self, iterator: AsyncIterator[T], timeout: float) -> None:
         self.iterator = iterator
         self.timeout = timeout
@@ -187,7 +197,7 @@ class ResilientEventSource:
         self.active = asyncio.get_running_loop().create_future()
 
     @staticmethod
-    def async_return[T](x: T) -> Callable[[], Awaitable[T]]:
+    def async_return(x: T) -> Callable[[], Awaitable[T]]:
         async def f() -> T:
             return x
 
@@ -613,11 +623,11 @@ class EditorAPIContext:
         response = await self.request("GET", f"state/image/{state_id}", params=params)
         return response.content
 
-    async def _run_one[Tin, Tout](
+    async def _run_one(
         self,
-        co: Callable[["EditorAPIContext", Tin], Awaitable[Tout]],
-        params: Tin,
-    ) -> Tout:
+        co: Callable[["EditorAPIContext", Any], Awaitable[Any]],
+        params: Any,
+    ) -> Any:
         # This wraps the coroutine in the SSE loop.
         # This is mostly useful if you use synchronous Python,
         # otherwise you can call the functions directly.
@@ -630,11 +640,11 @@ class EditorAPIContext:
         finally:
             await self.sse_stop()
 
-    def run_one_sync[Tin, Tout](
+    def run_one_sync(
         self,
-        co: Callable[["EditorAPIContext", Tin], Awaitable[Tout]],
-        params: Tin,
-    ) -> Tout:
+        co: Callable[["EditorAPIContext", Any], Awaitable[Any]],
+        params: Any,
+    ) -> Any:
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -992,7 +1002,7 @@ class EditorApiAsyncClient:
         status = await self.ctx.sse_await(state_id, timeout=timeout)
         return state_id, status
 
-    async def _response[Tok: OKResult, Tko: ErrorResult](
+    async def _response(
         self,
         st: StateID,
         ok: bool,
@@ -1007,22 +1017,21 @@ class EditorApiAsyncClient:
             assert meta["status"] == "ko"
             return t_ko(state_id=st, meta=meta)
 
-    async def _response_with_image[Tok: OKResultWithImage, Tko: ErrorResult](
+    async def _response_with_image(
         self,
         st: StateID,
         ok: bool,
-        t_ok: type[Tok] = OKResultWithImage,
+        t_ok: type[TokWithImage] = OKResultWithImage,
         t_ko: type[Tko] = ErrorResult,
         params: ImageOutParams | None = None,
-    ) -> Tok | Tko:
+    ) -> TokWithImage | Tko:
         if ok:
             if params is None:
                 params = ImageOutParams()
-            async with asyncio.TaskGroup() as tg:
-                meta_f = tg.create_task(self.ctx.get_meta(st))
-                image_f = tg.create_task(self.ctx.get_image(st, params.image_format, params.resolution))
-            meta = meta_f.result()
-            image = image_f.result()
+            meta, image = await asyncio.gather(
+                self.ctx.get_meta(st),
+                self.ctx.get_image(st, params.image_format, params.resolution),
+            )
             assert meta["status"] == "ok"
             return t_ok(state_id=st, meta=meta, image=image)
         else:
