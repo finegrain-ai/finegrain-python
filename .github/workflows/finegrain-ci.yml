@@ -18,27 +18,21 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: Install Rye
-        uses: eifinger/setup-rye@v4
+      - name: install uv
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-          cache-prefix: 'finegrain-rye-cache'
-          working-directory: 'finegrain'
+          cache-suffix: "finegrain-python"
+          cache-dependency-glob: "**/finegrain/uv.lock"
 
-      - name: add shims dir to PATH
-        run: echo "$RYE_HOME/shims" >> $GITHUB_PATH
-
-      - name: get pyright
-        run: rye tools install pyright --force
-
-      - name: rye sync
-        run: rye sync
+      - name: uv sync
+        run: uv sync --frozen --all-extras --dev
 
       - name: format
-        run: rye fmt --check
+        run: uv run ruff format
 
       - name: lint
-        run: rye lint
+        run: uv run ruff check
 
       - name: typecheck
-        run: pyright
+        run: uv run pyright

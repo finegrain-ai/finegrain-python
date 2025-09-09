@@ -26,16 +26,16 @@ If you run in a synchronous context and do not want to manage asyncio, see [this
 
 You need API credentials (an API key or an email and a password) to run tests. Be careful: doing so will use credits!
 
-To install dependencies, install [Rye](https://rye.astral.sh) and run:
+To install dependencies, install [uv](https://docs.astral.sh/uv/) and run:
 
 ```bash
-rye sync
+uv sync --all-extras
 ```
 
 The most basic way to run tests is:
 
 ```bash
-FG_API_CREDENTIALS=FGAPI-ABCDEF-123456-7890AB-CDEF12 rye test
+FG_API_CREDENTIALS=FGAPI-ABCDEF-123456-7890AB-CDEF12 uv run pytest
 ```
 
 If you run tests to debug something you can use for instance:
@@ -47,6 +47,6 @@ mkdir -p "$odir"
 FG_API_CREDENTIALS=FGAPI-ABCDEF-123456-7890AB-CDEF12 \
 FG_API_URL="https://.../editor" \
 FG_TESTS_OUTPUT_DIR="$odir" \
-    rye run pytest -v \
+    uv run pytest -v \
     -s -o log_cli=true -o log_level=INFO
 ```
