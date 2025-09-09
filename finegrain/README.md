@@ -1,6 +1,6 @@
 # Finegrain API - Python client
 
-This is a client for the [Finegrain](https://finegrain.ai) API. It requires Python 3.12+ and is designed for asynchronous code using asyncio. It depends on httpx and [httpx_sse](https://github.com/florimondmanca/httpx-sse).
+This is a client for the [Finegrain](https://finegrain.ai) API. It requires Python 3.12+ (but we have a branch supporting 3.10, see below) and is designed for asynchronous code using asyncio. It depends on httpx and [httpx_sse](https://github.com/florimondmanca/httpx-sse).
 
 ## Setup
 
@@ -50,3 +50,7 @@ FG_TESTS_OUTPUT_DIR="$odir" \
     uv run pytest -v \
     -s -o log_cli=true -o log_level=INFO
 ```
+
+## Python 3.10
+
+This package leverages features from Python 3.11 (e.g. asyncio [Task Groups](https://docs.python.org/3/library/asyncio-task.html#task-groups)) and 3.12 (e.g. the [Type Parameter syntax](https://peps.python.org/pep-0695/)). For users stuck with 3.10 (e.g. on Hugging Face's ZeroGPU spaces) we provide [a branch](https://github.com/finegrain-ai/finegrain-python/tree/py310) you can use. This branch is not intended to me merged back into main.
