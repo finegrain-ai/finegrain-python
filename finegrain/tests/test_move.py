@@ -16,11 +16,10 @@ async def test_move(
     segment_r = await fgctx.call_async.segment(st_input, bbox=bbox_r.bbox)
     assert isinstance(segment_r, OKResult)
 
-    async with asyncio.TaskGroup() as tg:
-        erase_task = tg.create_task(fgctx.call_async.erase(st_input, segment_r.state_id))
-        cutout_task = tg.create_task(fgctx.call_async.cutout(st_input, segment_r.state_id))
-
-    erase_r, cutout_r = erase_task.result(), cutout_task.result()
+    erase_r, cutout_r = await asyncio.gather(
+        fgctx.call_async.erase(st_input, segment_r.state_id),
+        fgctx.call_async.cutout(st_input, segment_r.state_id),
+    )
     assert isinstance(erase_r, OKResult)
     assert isinstance(cutout_r, OKResult)
 
