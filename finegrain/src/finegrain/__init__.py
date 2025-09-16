@@ -682,7 +682,7 @@ CreateStateErrorCode = Literal["file_too_large", "download_error", "invalid_imag
 Trinary = Literal["yes", "no", "unknown"]
 Size2D = tuple[int, int]
 BoundingBox = tuple[int, int, int, int]
-Mode = Literal["express", "standard", "premium"]
+Mode = Literal["express", "standard"]
 MaskQuality = Literal["low", "high"]
 
 
@@ -768,38 +768,6 @@ class CreateStateError(ErrorResult):
     def error_code(self) -> CreateStateErrorCode:
         v = self.meta["error_code"]
         assert v in get_args(CreateStateErrorCode)
-        return v
-
-
-class InferIsProductResult(OKResult):
-    @property
-    def is_product(self) -> Trinary:
-        v = self.meta["is_product"]
-        assert v in get_args(Trinary)
-        return v
-
-
-class InferProductNameResult(OKResult):
-    @property
-    def is_product(self) -> str:
-        v = self.meta["product_name"]
-        assert isinstance(v, str)
-        return v
-
-
-class InferMainSubjectResult(OKResult):
-    @property
-    def main_subject(self) -> str:
-        v = self.meta["main_subject"]
-        assert isinstance(v, str)
-        return v
-
-
-class InferCommercialDescriptionResult(OKResult):
-    @property
-    def commercial_description_en(self) -> str:
-        v = self.meta["commercial_description_en"]
-        assert isinstance(v, str)
         return v
 
 
@@ -1080,30 +1048,6 @@ class EditorApiAsyncClient:
         st, ok = await self._create_state(file, file_url, meta, timeout)
         return await self._response(st, ok, CreateStateResult, CreateStateError)
 
-    async def infer_is_product(
-        self,
-        state_id: StateID,
-        timeout: float | None = None,
-    ) -> InferIsProductResult | ErrorResult:
-        st, ok = await self.ctx.call_skill(f"infer-is-product/{state_id}", timeout=timeout)
-        return await self._response(st, ok, InferIsProductResult)
-
-    async def infer_product_name(
-        self,
-        state_id: StateID,
-        timeout: float | None = None,
-    ) -> InferProductNameResult | ErrorResult:
-        st, ok = await self.ctx.call_skill(f"infer-product-name/{state_id}", timeout=timeout)
-        return await self._response(st, ok, InferProductNameResult)
-
-    async def infer_main_subject(
-        self,
-        state_id: StateID,
-        timeout: float | None = None,
-    ) -> InferMainSubjectResult | ErrorResult:
-        st, ok = await self.ctx.call_skill(f"infer-main-subject/{state_id}", timeout=timeout)
-        return await self._response(st, ok, InferMainSubjectResult)
-
     async def infer_bbox(
         self,
         state_id: StateID,
@@ -1260,40 +1204,6 @@ class EditorApiAsyncClient:
             image_params = None if isinstance(with_image, bool) else with_image
             return await self._response_with_image(st, ok, ShadowResultWithImage, params=image_params)
         return await self._response(st, ok, ShadowResult)
-
-    async def switch_light(
-        self,
-        state_id: StateID,
-        *,
-        seed: int | None = None,
-        mode: Mode = "premium",
-        with_image: bool | ImageOutParams = False,
-        timeout: float | None = None,
-    ) -> SwitchLightResult | ErrorResult:
-        params: dict[str, Any] = {"mode": mode}
-        if seed is not None:
-            params["seed"] = seed
-        st, ok = await self.ctx.call_skill(f"switch-light/{state_id}", params, timeout=timeout)
-        if with_image:
-            image_params = None if isinstance(with_image, bool) else with_image
-            return await self._response_with_image(st, ok, SwitchLightResultWithImage, params=image_params)
-        return await self._response(st, ok, SwitchLightResult)
-
-    async def set_light_params(
-        self,
-        state_id: StateID,
-        brightness: float = 1.0,
-        warmth: float = 1.0,
-        *,
-        with_image: bool | ImageOutParams = False,
-        timeout: float | None = None,
-    ) -> SetLightParamsResult | ErrorResult:
-        params: dict[str, Any] = {"brightness": brightness, "warmth": warmth}
-        st, ok = await self.ctx.call_skill(f"set-light-params/{state_id}", params, timeout=timeout)
-        if with_image:
-            image_params = None if isinstance(with_image, bool) else with_image
-            return await self._response_with_image(st, ok, SetLightParamsResultWithImage, params=image_params)
-        return await self._response(st, ok, SetLightParamsResult)
 
     async def recolor(
         self,

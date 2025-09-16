@@ -30,13 +30,12 @@ async def test_subscription_topic(
     assert isinstance(create_r, OKResult)
     assert create_r.meta["test-key"] == "test-value"
 
-    # to test credits update mechanism
+    # test credits update mechanism
     assert isinstance(ctx.credits, int)
     ctx.credits = None
 
-    infer_ms_r = await ctx.call_async.infer_product_name(create_r.state_id)
-    assert isinstance(infer_ms_r, OKResult)
-    assert infer_ms_r.meta["product_name"] == "sofa"
+    infer_bbox_r = await ctx.call_async.infer_bbox(create_r.state_id, product_name="sofa")
+    assert isinstance(infer_bbox_r, OKResult)
 
     if subscription_topic is not None:
         assert ctx.credits is None
